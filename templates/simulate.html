@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DenseWealth — Strategy Simulator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            slate: {
+              850: '#161d2f',
+              950: '#0b1120',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background: #0b1120; }
+    .card { background: #161d2f; border: 1px solid #1e293b; }
+    .table-row:hover { background: rgba(30, 41, 59, 0.5); }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0b1120; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none;
+      height: 6px; background: #334155; border-radius: 3px; outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #38bdf8; cursor: pointer;
+    }
+  </style>
+</head>
+<body class="text-slate-300 min-h-screen font-sans">
+
+  <!-- Header -->
+  <header class="border-b border-slate-700/50 px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <a href="/" class="text-xl font-bold text-white tracking-tight hover:text-slate-200">DENSEWEALTH</a>
+      <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30">
+        STRATEGY SIMULATOR
+      </span>
+    </div>
+    <a href="/" class="text-sm text-slate-400 hover:text-white transition-colors">Dashboard</a>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+    <!-- Parameter Controls -->
+    <div class="card rounded-xl p-5">
+      <h2 class="text-sm font-semibold text-white mb-4">Simulation Parameters</h2>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <!-- Trader -->
+        <div>
+          <label class="text-xs text-slate-500 uppercase tracking-wide block mb-1">Trader</label>
+          <select id="trader-select" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500">
+            <option value="0x2d8b401d2f0e6937afebf18e19e11ca568a5260a">vidarx</option>
+            <option value="0x1979ae6b7e6534de9c4539d0c205e582ca637c9d">Square-Guy</option>
+            <option value="0x1d0034134e339a309700ff2d34e99fa2d48b0313">Canine-Commandment</option>
+            <option value="">All Traders</option>
+          </select>
+        </div>
+
+        <!-- Timeframe -->
+        <div>
+          <label class="text-xs text-slate-500 uppercase tracking-wide block mb-1">Timeframe</label>
+          <select id="hours-select" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500">
+            <option value="24">Last 24 hours</option>
+            <option value="48">Last 48 hours</option>
+            <option value="168">Last 7 days</option>
+            <option value="720">Last 30 days</option>
+            <option value="8760">All time</option>
+          </select>
+        </div>
+
+        <!-- Strategy -->
+        <div>
+          <label class="text-xs text-slate-500 uppercase tracking-wide block mb-1">Copy Strategy</label>
+          <select id="strategy-select" onchange="toggleFixedAmt()" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500">
+            <option value="tiered_fixed" selected>Tiered Fixed</option>
+            <option value="proportional">Proportional</option>
+            <option value="fixed">Fixed Amount</option>
+          </select>
+        </div>
+
+        <!-- Fixed Amount (conditional) -->
+        <div id="fixed-amt-container" class="hidden">
+          <label class="text-xs text-slate-500 uppercase tracking-wide block mb-1">Fixed Amount (USDC)</label>
+          <input id="input-fixed-amt" type="number" value="10" min="1" max="500" step="1" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500" />
+        </div>
+      </div>
+
+      <!-- Sliders -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-5">
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-slate-500 uppercase tracking-wide">Starting Balance</label>
+            <span id="val-balance" class="text-xs text-sky-400 font-mono">$186</span>
+          </div>
+          <input id="slider-balance" type="range" min="100" max="10000" step="1" value="186" oninput="updateLabel('balance')" class="w-full" />
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-slate-500 uppercase tracking-wide">Max Trade</label>
+            <span id="val-trade" class="text-xs text-sky-400 font-mono">15%</span>
+          </div>
+          <input id="slider-trade" type="range" min="1" max="30" step="1" value="15" oninput="updateLabel('trade')" class="w-full" />
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-slate-500 uppercase tracking-wide">Max / Wallet</label>
+            <span id="val-wallet" class="text-xs text-sky-400 font-mono">50%</span>
+          </div>
+          <input id="slider-wallet" type="range" min="10" max="80" step="5" value="50" oninput="updateLabel('wallet')" class="w-full" />
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-slate-500 uppercase tracking-wide">Max / Market</label>
+            <span id="val-market" class="text-xs text-sky-400 font-mono">15%</span>
+          </div>
+          <input id="slider-market" type="range" min="5" max="40" step="5" value="15" oninput="updateLabel('market')" class="w-full" />
+        </div>
+        <div>
+          <div class="flex justify-between mb-1">
+            <label class="text-xs text-slate-500 uppercase tracking-wide">Slippage</label>
+            <span id="val-slippage" class="text-xs text-sky-400 font-mono">10 bps</span>
+          </div>
+          <input id="slider-slippage" type="range" min="0" max="50" step="5" value="10" oninput="updateLabel('slippage')" class="w-full" />
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex gap-3">
+        <button id="actual-btn" onclick="showActual()" class="px-5 py-2.5 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition-colors">
+          Show Actual
+        </button>
+        <button id="sim-btn" onclick="runSimulation()" class="px-5 py-2.5 text-sm font-medium rounded-lg bg-sky-600 text-white hover:bg-sky-500 transition-colors">
+          Run Simulation
+        </button>
+        <button id="opt-btn" onclick="runOptimizer()" class="px-5 py-2.5 text-sm font-medium rounded-lg bg-violet-600 text-white hover:bg-violet-500 transition-colors">
+          Auto-Optimize
+        </button>
+        <span id="status-msg" class="self-center text-xs text-slate-500"></span>
+      </div>
+    </div>
+
+    <!-- Error Message -->
+    <div id="error-card" class="hidden card rounded-xl p-4 border-red-500/30">
+      <p id="error-text" class="text-red-400 text-sm"></p>
+    </div>
+
+    <!-- Actual Results -->
+    <div id="actual-section" class="hidden space-y-4">
+      <div>
+        <h3 class="text-xs text-slate-500 uppercase tracking-wide mb-2">
+          Actual Results
+          <span id="actual-period" class="text-slate-600 ml-2"></span>
+        </h3>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+          <div class="card rounded-xl p-3 border-emerald-500/20">
+            <div class="text-xs text-slate-500 mb-0.5">Final Balance</div>
+            <div id="act-balance" class="text-lg font-bold text-white font-mono">--</div>
+          </div>
+          <div class="card rounded-xl p-3 border-emerald-500/20">
+            <div class="text-xs text-slate-500 mb-0.5">P&L</div>
+            <div id="act-pnl" class="text-lg font-bold font-mono">--</div>
+          </div>
+          <div class="card rounded-xl p-3 border-emerald-500/20">
+            <div class="text-xs text-slate-500 mb-0.5">Return</div>
+            <div id="act-return" class="text-lg font-bold font-mono">--</div>
+          </div>
+          <div class="card rounded-xl p-3 border-emerald-500/20">
+            <div class="text-xs text-slate-500 mb-0.5">Win Rate</div>
+            <div id="act-winrate" class="text-lg font-bold font-mono">--</div>
+          </div>
+          <div class="card rounded-xl p-3 border-emerald-500/20">
+            <div class="text-xs text-slate-500 mb-0.5">Max Drawdown</div>
+            <div id="act-drawdown" class="text-lg font-bold text-red-400 font-mono">--</div>
+          </div>
+          <div class="card rounded-xl p-3 border-emerald-500/20">
+            <div class="text-xs text-slate-500 mb-0.5">Deployed</div>
+            <div id="act-deployed" class="text-lg font-bold text-white font-mono">--</div>
+          </div>
+          <div class="card rounded-xl p-3 border-emerald-500/20">
+            <div class="text-xs text-slate-500 mb-0.5">Buys / Resolved</div>
+            <div id="act-trades" class="text-lg font-bold text-white font-mono">--</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actual Trade Table -->
+      <div class="card rounded-xl overflow-hidden">
+        <div class="px-5 py-3 border-b border-slate-700/50 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-white">Actual Trade History</h2>
+          <span id="actual-trade-count" class="text-xs text-slate-500">0 trades</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-700/50">
+                <th class="text-left px-4 py-2.5 font-medium">Time</th>
+                <th class="text-center px-4 py-2.5 font-medium">Fund</th>
+                <th class="text-center px-4 py-2.5 font-medium">Side</th>
+                <th class="text-center px-4 py-2.5 font-medium">Bet</th>
+                <th class="text-right px-4 py-2.5 font-medium">Shares</th>
+                <th class="text-right px-4 py-2.5 font-medium">Price</th>
+                <th class="text-right px-4 py-2.5 font-medium">Amount</th>
+                <th class="text-left px-4 py-2.5 font-medium">Market</th>
+              </tr>
+            </thead>
+            <tbody id="actual-trades-body">
+              <tr><td colspan="8" class="px-4 py-8 text-center text-slate-600">Click "Show Actual" to load</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Summary -->
+    <div id="results-section" class="hidden space-y-4">
+
+      <!-- Current Sim Results -->
+      <div>
+        <h3 class="text-xs text-slate-500 uppercase tracking-wide mb-2">Simulation Results</h3>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div class="card rounded-xl p-3">
+            <div class="text-xs text-slate-500 mb-0.5">Final Balance</div>
+            <div id="res-balance" class="text-lg font-bold text-white font-mono">--</div>
+          </div>
+          <div class="card rounded-xl p-3">
+            <div class="text-xs text-slate-500 mb-0.5">P&L</div>
+            <div id="res-pnl" class="text-lg font-bold font-mono">--</div>
+          </div>
+          <div class="card rounded-xl p-3">
+            <div class="text-xs text-slate-500 mb-0.5">Return</div>
+            <div id="res-return" class="text-lg font-bold font-mono">--</div>
+          </div>
+          <div class="card rounded-xl p-3">
+            <div class="text-xs text-slate-500 mb-0.5">Win Rate</div>
+            <div id="res-winrate" class="text-lg font-bold font-mono">--</div>
+          </div>
+          <div class="card rounded-xl p-3">
+            <div class="text-xs text-slate-500 mb-0.5">Max Drawdown</div>
+            <div id="res-drawdown" class="text-lg font-bold text-red-400 font-mono">--</div>
+          </div>
+          <div class="card rounded-xl p-3">
+            <div class="text-xs text-slate-500 mb-0.5">Buys Executed</div>
+            <div id="res-trades" class="text-lg font-bold text-white font-mono">--</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Optimized Results (shown after optimizer runs) -->
+      <div id="opt-results-section" class="hidden">
+        <h3 class="text-xs text-slate-500 uppercase tracking-wide mb-2">
+          Optimized Best
+          <span id="opt-combos" class="text-slate-600 ml-2"></span>
+        </h3>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div class="card rounded-xl p-3 border-emerald-500/30">
+            <div class="text-xs text-slate-500 mb-0.5">Final Balance</div>
+            <div id="opt-balance" class="text-lg font-bold text-emerald-400 font-mono">--</div>
+          </div>
+          <div class="card rounded-xl p-3 border-emerald-500/30">
+            <div class="text-xs text-slate-500 mb-0.5">P&L</div>
+            <div id="opt-pnl" class="text-lg font-bold text-emerald-400 font-mono">--</div>
+          </div>
+          <div class="card rounded-xl p-3 border-emerald-500/30">
+            <div class="text-xs text-slate-500 mb-0.5">Return</div>
+            <div id="opt-return" class="text-lg font-bold text-emerald-400 font-mono">--</div>
+          </div>
+          <div class="card rounded-xl p-3 border-emerald-500/30">
+            <div class="text-xs text-slate-500 mb-0.5">Win Rate</div>
+            <div id="opt-winrate" class="text-lg font-bold font-mono">--</div>
+          </div>
+          <div class="card rounded-xl p-3 border-emerald-500/30">
+            <div class="text-xs text-slate-500 mb-0.5">Max Drawdown</div>
+            <div id="opt-drawdown" class="text-lg font-bold text-red-400 font-mono">--</div>
+          </div>
+          <div class="card rounded-xl p-3 border-emerald-500/30">
+            <div class="text-xs text-slate-500 mb-0.5">Params</div>
+            <div id="opt-params" class="text-xs text-slate-300 leading-tight">--</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Per-Trade Breakdown -->
+    <div id="trades-section" class="hidden card rounded-xl overflow-hidden">
+      <div class="px-5 py-3 border-b border-slate-700/50 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-white">Trade-by-Trade Replay</h2>
+        <span id="trade-count-label" class="text-xs text-slate-500">0 trades</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-700/50">
+              <th class="text-left px-4 py-2.5 font-medium">Time</th>
+              <th class="text-center px-4 py-2.5 font-medium">Side</th>
+              <th class="text-center px-4 py-2.5 font-medium">Bet</th>
+              <th class="text-right px-4 py-2.5 font-medium">Original $</th>
+              <th class="text-right px-4 py-2.5 font-medium">Sim $</th>
+              <th class="text-right px-4 py-2.5 font-medium">Price</th>
+              <th class="text-right px-4 py-2.5 font-medium">Sim P&L</th>
+              <th class="text-right px-4 py-2.5 font-medium">Balance</th>
+              <th class="text-left px-4 py-2.5 font-medium">Market</th>
+            </tr>
+          </thead>
+          <tbody id="trades-body">
+            <tr><td colspan="9" class="px-4 py-8 text-center text-slate-600">Run a simulation to see results</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Optimizer Leaderboard -->
+    <div id="optimizer-section" class="hidden card rounded-xl overflow-hidden">
+      <div class="px-5 py-3 border-b border-slate-700/50 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-white">Top Parameter Combinations</h2>
+        <span id="opt-tested-label" class="text-xs text-slate-500"></span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-700/50">
+              <th class="text-center px-3 py-2.5 font-medium">#</th>
+              <th class="text-center px-3 py-2.5 font-medium">Strategy</th>
+              <th class="text-center px-3 py-2.5 font-medium">MaxTrade</th>
+              <th class="text-center px-3 py-2.5 font-medium">MaxWallet</th>
+              <th class="text-center px-3 py-2.5 font-medium">MaxMarket</th>
+              <th class="text-center px-3 py-2.5 font-medium">Slip</th>
+              <th class="text-center px-3 py-2.5 font-medium">Fixed$</th>
+              <th class="text-right px-3 py-2.5 font-medium">P&L</th>
+              <th class="text-right px-3 py-2.5 font-medium">Return</th>
+              <th class="text-center px-3 py-2.5 font-medium">W/L</th>
+              <th class="text-right px-3 py-2.5 font-medium">Drawdown</th>
+              <th class="text-center px-3 py-2.5 font-medium"></th>
+            </tr>
+          </thead>
+          <tbody id="optimizer-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    function $(id) { return document.getElementById(id); }
+
+    function pnlColor(val) {
+      if (val > 0) return 'text-emerald-400';
+      if (val < 0) return 'text-red-400';
+      return 'text-slate-400';
+    }
+
+    function pnlSign(val) {
+      return val > 0 ? `+${val.toFixed(2)}` : val.toFixed(2);
+    }
+
+    function outcomeBadge(outcome) {
+      if (!outcome) return '<span class="text-xs text-slate-600">--</span>';
+      const lower = outcome.toLowerCase();
+      let color, bg;
+      if (lower === 'up' || lower === 'yes') {
+        color = 'text-emerald-400'; bg = 'bg-emerald-500/10';
+      } else if (lower === 'down' || lower === 'no') {
+        color = 'text-red-400'; bg = 'bg-red-500/10';
+      } else {
+        color = 'text-sky-400'; bg = 'bg-sky-500/10';
+      }
+      return `<span class="px-2 py-0.5 rounded text-xs font-medium ${color} ${bg}">${outcome}</span>`;
+    }
+
+    // ── Slider labels ─────────────────────────────────────
+    function updateLabel(name) {
+      const v = $(`slider-${name}`).value;
+      if (name === 'balance') $('val-balance').textContent = `$${Number(v).toLocaleString()}`;
+      else if (name === 'slippage') $('val-slippage').textContent = `${v} bps`;
+      else $(`val-${name}`).textContent = `${v}%`;
+    }
+
+    function toggleFixedAmt() {
+      const isFixed = $('strategy-select').value === 'fixed';
+      $('fixed-amt-container').classList.toggle('hidden', !isFixed);
+    }
+
+    // ── Gather parameters ─────────────────────────────────
+    function getParams() {
+      return {
+        hours: parseInt($('hours-select').value),
+        trader_wallet: $('trader-select').value || null,
+        starting_balance: parseFloat($('slider-balance').value),
+        max_trade_pct: parseFloat($('slider-trade').value) / 100,
+        max_wallet_pct: parseFloat($('slider-wallet').value) / 100,
+        max_market_pct: parseFloat($('slider-market').value) / 100,
+        slippage_bps: parseFloat($('slider-slippage').value),
+        copy_strategy: $('strategy-select').value,
+        copy_amount_usdc: parseFloat($('input-fixed-amt').value),
+      };
+    }
+
+    // ── Show Actual Results ──────────────────────────────
+    async function showActual() {
+      const btn = $('actual-btn');
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+      $('status-msg').textContent = '';
+      $('error-card').classList.add('hidden');
+
+      try {
+        const params = getParams();
+        const res = await fetch('/api/actual-results', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            hours: params.hours,
+            trader_wallet: params.trader_wallet,
+          }),
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          showError(data.error);
+          return;
+        }
+
+        const s = data.summary;
+
+        // Render summary cards
+        $('act-balance').textContent = `$${s.final_balance.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+        const pnlEl = $('act-pnl');
+        pnlEl.textContent = `$${pnlSign(s.total_pnl)}`;
+        pnlEl.className = `text-lg font-bold font-mono ${pnlColor(s.total_pnl)}`;
+
+        const retEl = $('act-return');
+        retEl.textContent = `${pnlSign(s.pnl_pct)}%`;
+        retEl.className = `text-lg font-bold font-mono ${pnlColor(s.pnl_pct)}`;
+
+        const resolved = s.wins + s.losses;
+        const wrEl = $('act-winrate');
+        wrEl.textContent = resolved > 0 ? `${s.win_rate.toFixed(0)}%` : '--';
+        wrEl.className = `text-lg font-bold font-mono ${s.win_rate >= 50 ? 'text-emerald-400' : 'text-red-400'}`;
+
+        $('act-drawdown').textContent = `${s.max_drawdown_pct.toFixed(1)}%`;
+        $('act-deployed').textContent = `$${s.total_deployed.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+        $('act-trades').textContent = `${s.buys_executed} / ${resolved}R`;
+
+        const hoursLabel = $('hours-select').selectedOptions[0].textContent;
+        $('actual-period').textContent = `(${hoursLabel})`;
+
+        // Render trade table
+        $('actual-trade-count').textContent = `${data.trade_count} trades`;
+
+        if (data.trades.length === 0) {
+          $('actual-trades-body').innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-600">No trades</td></tr>';
+        } else {
+          let html = '';
+          for (const t of data.trades) {
+            let sideColor, sideBg;
+            if (t.side === 'RESOLVE') {
+              sideColor = t.price > 0 ? 'text-violet-400' : 'text-slate-400';
+              sideBg = t.price > 0 ? 'bg-violet-500/10' : 'bg-slate-500/10';
+            } else if (t.side === 'BUY') {
+              sideColor = 'text-emerald-400'; sideBg = 'bg-emerald-500/10';
+            } else {
+              sideColor = 'text-red-400'; sideBg = 'bg-red-500/10';
+            }
+
+            const fundColors = {
+              main:    { text: 'text-sky-400',    bg: 'bg-sky-500/10' },
+              charity: { text: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+              savings: { text: 'text-amber-400',  bg: 'bg-amber-500/10' },
+              family:  { text: 'text-purple-400', bg: 'bg-purple-500/10' },
+            };
+            const fc = fundColors[t.fund_id] || { text: 'text-slate-400', bg: 'bg-slate-500/10' };
+            const fundLabel = t.fund_id ? t.fund_id.charAt(0).toUpperCase() + t.fund_id.slice(1) : 'Main';
+
+            html += `
+              <tr class="table-row border-b border-slate-700/20">
+                <td class="px-4 py-2 text-slate-500 font-mono text-xs">${t.time}</td>
+                <td class="px-4 py-2 text-center"><span class="px-1.5 py-0.5 rounded text-xs font-medium ${fc.text} ${fc.bg}">${fundLabel}</span></td>
+                <td class="px-4 py-2 text-center">
+                  <span class="px-2 py-0.5 rounded text-xs font-medium ${sideColor} ${sideBg}">${t.side}</span>
+                </td>
+                <td class="px-4 py-2 text-center">${outcomeBadge(t.outcome)}</td>
+                <td class="px-4 py-2 text-right font-mono text-xs">${t.shares.toFixed(4)}</td>
+                <td class="px-4 py-2 text-right font-mono text-xs">$${t.price.toFixed(4)}</td>
+                <td class="px-4 py-2 text-right font-mono text-xs">$${t.usdc_amount.toFixed(2)}</td>
+                <td class="px-4 py-2 text-slate-400 font-mono text-xs">${t.market_id}</td>
+              </tr>`;
+          }
+          $('actual-trades-body').innerHTML = html;
+        }
+
+        $('actual-section').classList.remove('hidden');
+        $('status-msg').textContent = `${data.trade_count} actual trades loaded`;
+      } catch (e) {
+        showError('Actual results request failed: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Show Actual';
+      }
+    }
+
+    // ── Run Simulation ────────────────────────────────────
+    async function runSimulation() {
+      const btn = $('sim-btn');
+      btn.disabled = true;
+      btn.textContent = 'Simulating...';
+      $('status-msg').textContent = '';
+      $('error-card').classList.add('hidden');
+
+      try {
+        const params = getParams();
+        const res = await fetch('/api/simulate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params),
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          showError(data.error);
+          return;
+        }
+
+        renderSummary(data.summary);
+        renderTradeTable(data.trades);
+        $('status-msg').textContent = `${data.trade_count} trades replayed`;
+        $('results-section').classList.remove('hidden');
+        $('trades-section').classList.remove('hidden');
+      } catch (e) {
+        showError('Simulation request failed: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Run Simulation';
+      }
+    }
+
+    // ── Run Optimizer ─────────────────────────────────────
+    async function runOptimizer() {
+      const btn = $('opt-btn');
+      btn.disabled = true;
+      btn.textContent = 'Optimizing...';
+      $('status-msg').textContent = 'Testing ~1,800 parameter combos...';
+      $('error-card').classList.add('hidden');
+
+      try {
+        const params = getParams();
+        const res = await fetch('/api/optimize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            hours: params.hours,
+            trader_wallet: params.trader_wallet,
+            starting_balance: params.starting_balance,
+            top_n: 20,
+          }),
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          showError(data.error);
+          return;
+        }
+
+        renderOptSummary(data.best, data.total_combos_tested);
+        renderOptimizerTable(data.top_results);
+
+        // Load best params into sliders so user can see what was optimal
+        loadParams(data.best, true);
+
+        $('status-msg').textContent = `Tested ${data.total_combos_tested} combos on ${data.trade_count} trades — sliders set to optimal`;
+        $('results-section').classList.remove('hidden');
+        $('opt-results-section').classList.remove('hidden');
+        $('optimizer-section').classList.remove('hidden');
+
+        // Auto-run simulation with the optimal params
+        await runSimulation();
+      } catch (e) {
+        showError('Optimizer request failed: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Auto-Optimize';
+      }
+    }
+
+    // ── Renderers ─────────────────────────────────────────
+    function showError(msg) {
+      $('error-text').textContent = msg;
+      $('error-card').classList.remove('hidden');
+    }
+
+    function renderSummary(s) {
+      $('res-balance').textContent = `$${s.final_balance.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+      const pnlEl = $('res-pnl');
+      pnlEl.textContent = `$${pnlSign(s.total_pnl)}`;
+      pnlEl.className = `text-lg font-bold font-mono ${pnlColor(s.total_pnl)}`;
+
+      const retEl = $('res-return');
+      retEl.textContent = `${pnlSign(s.pnl_pct)}%`;
+      retEl.className = `text-lg font-bold font-mono ${pnlColor(s.pnl_pct)}`;
+
+      const resolved = s.wins + s.losses;
+      const wrEl = $('res-winrate');
+      wrEl.textContent = resolved > 0 ? `${s.win_rate.toFixed(0)}%` : '--';
+      wrEl.className = `text-lg font-bold font-mono ${s.win_rate >= 50 ? 'text-emerald-400' : 'text-red-400'}`;
+
+      $('res-drawdown').textContent = `${s.max_drawdown_pct.toFixed(1)}%`;
+      $('res-trades').textContent = `${s.buys_executed} / ${s.wins + s.losses}R`;
+    }
+
+    function renderOptSummary(best, totalCombos) {
+      $('opt-combos').textContent = `(${totalCombos.toLocaleString()} tested)`;
+      $('opt-balance').textContent = `$${best.final_balance.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+      $('opt-pnl').textContent = `$${pnlSign(best.total_pnl)}`;
+      $('opt-return').textContent = `${pnlSign(best.pnl_pct)}%`;
+
+      const resolved = best.wins + best.losses;
+      $('opt-winrate').textContent = resolved > 0 ? `${best.win_rate.toFixed(0)}%` : '--';
+      $('opt-winrate').className = `text-lg font-bold font-mono ${best.win_rate >= 50 ? 'text-emerald-400' : 'text-red-400'}`;
+
+      $('opt-drawdown').textContent = `${best.max_drawdown_pct.toFixed(1)}%`;
+
+      const stratLabel = best.strategy === 'fixed' ? `Fixed $${best.copy_amount_usdc}` : 'Proportional';
+      $('opt-params').innerHTML = `
+        <div>${stratLabel}</div>
+        <div>Trade:${(best.max_trade_pct*100).toFixed(0)}% Wallet:${(best.max_wallet_pct*100).toFixed(0)}% Market:${(best.max_market_pct*100).toFixed(0)}%</div>
+        <div>Slip:${best.slippage_bps}bps</div>
+      `;
+    }
+
+    function renderTradeTable(trades) {
+      $('trade-count-label').textContent = `${trades.length} trades`;
+
+      if (trades.length === 0) {
+        $('trades-body').innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-slate-600">No trades</td></tr>';
+        return;
+      }
+
+      let html = '';
+      for (const t of trades) {
+        let sideColor, sideBg;
+        if (t.side === 'RESOLVE') {
+          sideColor = t.price > 0 ? 'text-violet-400' : 'text-slate-400';
+          sideBg = t.price > 0 ? 'bg-violet-500/10' : 'bg-slate-500/10';
+        } else if (t.side === 'BUY') {
+          sideColor = 'text-emerald-400'; sideBg = 'bg-emerald-500/10';
+        } else {
+          sideColor = 'text-red-400'; sideBg = 'bg-red-500/10';
+        }
+
+        const pnlCls = pnlColor(t.sim_pnl);
+        const pnlText = t.sim_pnl !== 0 ? `$${pnlSign(t.sim_pnl)}` : '--';
+        const skipped = t.side === 'BUY' && t.sim_usdc === 0;
+
+        html += `
+          <tr class="table-row border-b border-slate-700/20 ${skipped ? 'opacity-40' : ''}">
+            <td class="px-4 py-2 text-slate-500 font-mono text-xs">${t.timestamp}</td>
+            <td class="px-4 py-2 text-center">
+              <span class="px-2 py-0.5 rounded text-xs font-medium ${sideColor} ${sideBg}">${t.side}</span>
+            </td>
+            <td class="px-4 py-2 text-center">${outcomeBadge(t.outcome)}</td>
+            <td class="px-4 py-2 text-right font-mono text-xs text-slate-400">$${t.original_usdc.toFixed(2)}</td>
+            <td class="px-4 py-2 text-right font-mono text-xs text-white">${skipped ? '<span class="text-slate-600">skipped</span>' : '$' + t.sim_usdc.toFixed(2)}</td>
+            <td class="px-4 py-2 text-right font-mono text-xs">$${t.price.toFixed(4)}</td>
+            <td class="px-4 py-2 text-right font-mono text-xs ${pnlCls}">${pnlText}</td>
+            <td class="px-4 py-2 text-right font-mono text-xs text-white">$${t.sim_balance_after.toFixed(2)}</td>
+            <td class="px-4 py-2 text-slate-400 font-mono text-xs">${t.market_id}</td>
+          </tr>`;
+      }
+      $('trades-body').innerHTML = html;
+    }
+
+    function renderOptimizerTable(results) {
+      $('opt-tested-label').textContent = `Top ${results.length}`;
+
+      let html = '';
+      for (let i = 0; i < results.length; i++) {
+        const r = results[i];
+        const isFirst = i === 0;
+        const pnlCls = pnlColor(r.total_pnl);
+        const rowBorder = isFirst ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-slate-700/20';
+        const fixedLabel = r.copy_amount_usdc !== null ? `$${r.copy_amount_usdc}` : '--';
+        const stratLabel = r.strategy === 'fixed' ? 'Fixed' : 'Prop';
+
+        html += `
+          <tr class="table-row border-b ${rowBorder}">
+            <td class="px-3 py-2 text-center text-xs ${isFirst ? 'text-emerald-400 font-bold' : 'text-slate-500'}">${i + 1}</td>
+            <td class="px-3 py-2 text-center text-xs">${stratLabel}</td>
+            <td class="px-3 py-2 text-center text-xs font-mono">${(r.max_trade_pct * 100).toFixed(0)}%</td>
+            <td class="px-3 py-2 text-center text-xs font-mono">${(r.max_wallet_pct * 100).toFixed(0)}%</td>
+            <td class="px-3 py-2 text-center text-xs font-mono">${(r.max_market_pct * 100).toFixed(0)}%</td>
+            <td class="px-3 py-2 text-center text-xs font-mono">${r.slippage_bps}</td>
+            <td class="px-3 py-2 text-center text-xs font-mono">${fixedLabel}</td>
+            <td class="px-3 py-2 text-right text-xs font-mono font-medium ${pnlCls}">$${pnlSign(r.total_pnl)}</td>
+            <td class="px-3 py-2 text-right text-xs font-mono ${pnlCls}">${pnlSign(r.pnl_pct)}%</td>
+            <td class="px-3 py-2 text-center text-xs font-mono">
+              <span class="text-emerald-400">${r.wins}</span><span class="text-slate-600">/</span><span class="text-red-400">${r.losses}</span>
+            </td>
+            <td class="px-3 py-2 text-right text-xs font-mono text-red-400">${r.max_drawdown_pct.toFixed(1)}%</td>
+            <td class="px-3 py-2 text-center">
+              <button onclick='loadParams(${JSON.stringify(r)})' class="px-2 py-1 text-xs rounded bg-slate-700 text-slate-300 hover:bg-sky-600 hover:text-white transition-colors">Load</button>
+            </td>
+          </tr>`;
+      }
+      $('optimizer-body').innerHTML = html;
+    }
+
+    function loadParams(r, silent) {
+      $('slider-trade').value = r.max_trade_pct * 100;
+      $('slider-wallet').value = r.max_wallet_pct * 100;
+      $('slider-market').value = r.max_market_pct * 100;
+      $('slider-slippage').value = r.slippage_bps;
+
+      if (r.strategy === 'fixed') {
+        $('strategy-select').value = 'fixed';
+        $('input-fixed-amt').value = r.copy_amount_usdc;
+      } else if (r.strategy === 'tiered_fixed') {
+        $('strategy-select').value = 'tiered_fixed';
+      } else {
+        $('strategy-select').value = 'proportional';
+      }
+      toggleFixedAmt();
+
+      // Update all slider labels
+      updateLabel('trade');
+      updateLabel('wallet');
+      updateLabel('market');
+      updateLabel('slippage');
+
+      // Flash the slider labels to show they changed
+      for (const name of ['trade', 'wallet', 'market', 'slippage']) {
+        const el = $(`val-${name}`);
+        el.classList.remove('text-sky-400');
+        el.classList.add('text-emerald-400');
+        setTimeout(() => {
+          el.classList.remove('text-emerald-400');
+          el.classList.add('text-sky-400');
+        }, 2000);
+      }
+
+      if (!silent) {
+        $('status-msg').textContent = 'Parameters loaded — click Run Simulation';
+      }
+    }
+  </script>
+
+</body>
+</html>

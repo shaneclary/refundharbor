@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>DenseWealth</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: {
+                            900: '#0a0f1a',
+                            800: '#111827',
+                            700: '#1a2332',
+                            600: '#243042',
+                        },
+                        slate: {
+                            850: '#16202d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        * {
+            font-family: 'Inter', system-ui, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            background: linear-gradient(180deg, #0a0f1a 0%, #111827 100%);
+            min-height: 100vh;
+            min-height: 100dvh;
+            height: 100%;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+        }
+
+        /* Main scrollable content */
+        #mainContent {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-y: contain;
+            padding-bottom: 100px; /* Space for bottom nav */
+        }
+
+        /* Prevent body scroll bounce on iOS */
+        @supports (-webkit-touch-callout: none) {
+            body {
+                height: -webkit-fill-available;
+            }
+        }
+
+        /* Touch-friendly buttons */
+        .touch-btn {
+            min-height: 44px;
+            min-width: 44px;
+        }
+
+        /* Swipeable cards */
+        .swipe-container {
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .swipe-card {
+            scroll-snap-align: center;
+            scroll-snap-stop: always;
+        }
+
+        /* Pull to refresh indicator */
+        .pull-indicator {
+            transition: transform 0.2s ease-out;
+        }
+
+        /* Bottom nav safe area */
+        .bottom-nav {
+            padding-bottom: env(safe-area-inset-bottom, 16px);
+        }
+
+        /* Smooth scrolling */
+        .smooth-scroll {
+            scroll-behavior: smooth;
+        }
+
+        /* Card glow effects */
+        .card-glow {
+            box-shadow: 0 0 40px rgba(59, 130, 246, 0.1);
+        }
+
+        /* Progress bar animation */
+        .progress-bar {
+            transition: width 0.5s ease-out;
+        }
+
+        /* Hide scrollbar but allow scrolling */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Slider styling */
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 8px;
+            border-radius: 4px;
+            background: #1a2332;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+        }
+
+        /* Toggle switch */
+        .toggle-switch {
+            width: 52px;
+            height: 28px;
+            background: #374151;
+            border-radius: 14px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .toggle-switch.active {
+            background: #10b981;
+        }
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+        .toggle-switch.active::after {
+            transform: translateX(24px);
+        }
+
+        /* Loading spinner */
+        .spinner {
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Tab indicator */
+        .tab-indicator {
+            transition: transform 0.3s ease-out, width 0.3s ease-out;
+        }
+    </style>
+</head>
+<body class="text-white">
+    <!-- Pull to Refresh Indicator -->
+    <div id="pullIndicator" class="pull-indicator fixed top-0 left-0 right-0 flex justify-center py-4 -translate-y-full z-50">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main id="mainContent" class="smooth-scroll">
+        <!-- Header -->
+        <header class="sticky top-0 z-40 bg-navy-900/95 backdrop-blur-sm border-b border-slate-700/50">
+            <div class="flex items-center justify-between px-4 py-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-sm">
+                        DW
+                    </div>
+                    <div>
+                        <h1 class="font-semibold text-lg leading-tight">DenseWealth</h1>
+                        <div id="modeIndicator" class="text-xs text-slate-400">Paper Mode</div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <!-- Admin notification badge -->
+                    <button id="adminNotifBtn" class="admin-only touch-btn p-2 rounded-lg hover:bg-slate-700/50 active:bg-slate-600/50 transition-colors relative hidden">
+                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                        </svg>
+                        <span id="headerNotifCount" class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs flex items-center justify-center font-bold hidden">0</span>
+                    </button>
+                    <button id="refreshBtn" class="touch-btn p-2 rounded-lg hover:bg-slate-700/50 active:bg-slate-600/50 transition-colors">
+                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                    </button>
+                    <div id="liveIndicator" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Account Switcher (Swipeable Cards) -->
+        <section class="px-4 py-4">
+            <div id="accountCards" class="swipe-container flex gap-4 overflow-x-auto hide-scrollbar pb-2">
+                <!-- Account cards will be inserted here -->
+                <div class="swipe-card flex-shrink-0 w-[calc(100%-2rem)] bg-gradient-to-br from-navy-700 to-navy-800 rounded-2xl p-5 card-glow">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <div class="text-slate-400 text-sm">Main Account</div>
+                            <div id="accountBalance" class="text-3xl font-bold mt-1">$0.00</div>
+                        </div>
+                        <div id="accountStatus" class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-medium">
+                            Active
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4 mt-4">
+                        <div>
+                            <div class="text-slate-400 text-xs">P&L</div>
+                            <div id="accountPnl" class="text-lg font-semibold text-emerald-400">+$0.00</div>
+                        </div>
+                        <div>
+                            <div class="text-slate-400 text-xs">Reserve</div>
+                            <div id="accountReserve" class="text-lg font-semibold">$0.00</div>
+                        </div>
+                        <div>
+                            <div class="text-slate-400 text-xs">Trades</div>
+                            <div id="accountTrades" class="text-lg font-semibold">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Card indicators -->
+            <div id="cardIndicators" class="flex justify-center gap-2 mt-3">
+                <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+            </div>
+        </section>
+
+        <!-- Quick Stats -->
+        <section class="px-4 py-2">
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-navy-700/50 rounded-xl p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-400 text-sm">Win Rate</span>
+                        <span id="winRate" class="text-xl font-semibold text-emerald-400">0%</span>
+                    </div>
+                    <div class="mt-2 h-1.5 bg-navy-600 rounded-full overflow-hidden">
+                        <div id="winRateBar" class="progress-bar h-full bg-emerald-500 rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="bg-navy-700/50 rounded-xl p-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-400 text-sm">Return</span>
+                        <span id="returnPct" class="text-xl font-semibold">0%</span>
+                    </div>
+                    <div class="mt-2 h-1.5 bg-navy-600 rounded-full overflow-hidden">
+                        <div id="returnBar" class="progress-bar h-full bg-blue-500 rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tab Navigation -->
+        <nav class="sticky top-14 z-30 bg-navy-900/95 backdrop-blur-sm border-b border-slate-700/50 mt-4">
+            <div id="tabNavContainer" class="flex relative overflow-x-auto hide-scrollbar">
+                <button data-tab="dashboard" class="tab-btn flex-1 py-3 text-sm font-medium text-blue-400 relative whitespace-nowrap px-3">
+                    Dashboard
+                </button>
+                <button data-tab="wallets" class="tab-btn flex-1 py-3 text-sm font-medium text-slate-400 relative whitespace-nowrap px-3">
+                    Wallets
+                </button>
+                <button data-tab="positions" class="tab-btn flex-1 py-3 text-sm font-medium text-slate-400 relative whitespace-nowrap px-3">
+                    Positions
+                </button>
+                <button data-tab="settings" class="tab-btn flex-1 py-3 text-sm font-medium text-slate-400 relative whitespace-nowrap px-3">
+                    Settings
+                </button>
+                <button data-tab="admin" class="tab-btn admin-only flex-1 py-3 text-sm font-medium text-slate-400 relative whitespace-nowrap px-3 hidden">
+                    <span class="flex items-center gap-1">
+                        Admin
+                        <span id="adminBadge" class="w-2 h-2 rounded-full bg-amber-500 hidden"></span>
+                    </span>
+                </button>
+                <div id="tabIndicator" class="tab-indicator absolute bottom-0 h-0.5 bg-blue-500" style="width: 25%; left: 0;"></div>
+            </div>
+        </nav>
+
+        <!-- Tab Content -->
+        <div id="tabContent" class="px-4 py-4">
+            <!-- Dashboard Tab -->
+            <div id="tab-dashboard" class="tab-panel">
+                <!-- Recent Trades -->
+                <div class="mb-6">
+                    <h3 class="text-sm font-medium text-slate-400 mb-3">Recent Trades</h3>
+                    <div id="recentTrades" class="space-y-2">
+                        <div class="text-center text-slate-500 py-8">No trades yet</div>
+                    </div>
+                </div>
+
+                <!-- Pending Approvals -->
+                <div id="pendingSection" class="mb-6 hidden">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-medium text-slate-400">Pending Approval</h3>
+                        <span id="pendingCount" class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-medium">0</span>
+                    </div>
+                    <div id="pendingTrades" class="space-y-2"></div>
+                    <div class="flex gap-2 mt-3">
+                        <button id="approveAllBtn" class="touch-btn flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 rounded-xl font-medium transition-colors">
+                            Approve All
+                        </button>
+                        <button id="rejectAllBtn" class="touch-btn flex-1 py-3 bg-red-600/20 hover:bg-red-600/30 active:bg-red-600/40 text-red-400 rounded-xl font-medium transition-colors">
+                            Reject All
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Performance Chart Placeholder -->
+                <div class="bg-navy-700/30 rounded-xl p-4 h-48 flex items-center justify-center">
+                    <div class="text-slate-500 text-sm">Performance chart coming soon</div>
+                </div>
+            </div>
+
+            <!-- Accounts Tab -->
+            <div id="tab-accounts" class="tab-panel hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-medium text-slate-400">Trading Accounts</h3>
+                    <button id="createAccountBtn" class="admin-only touch-btn px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors">
+                        + New Account
+                    </button>
+                </div>
+
+                <div id="accountsList" class="space-y-3">
+                    <div class="text-center text-slate-500 py-8">Loading accounts...</div>
+                </div>
+            </div>
+
+            <!-- Wallets Tab -->
+            <div id="tab-wallets" class="tab-panel hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-medium text-slate-400">Tracked Wallets</h3>
+                    <button id="addWalletBtn" class="touch-btn px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors">
+                        + Add Wallet
+                    </button>
+                </div>
+
+                <div id="walletList" class="space-y-3">
+                    <!-- Wallet cards with allocation sliders -->
+                </div>
+
+                <div class="mt-4 p-4 bg-navy-700/30 rounded-xl">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm text-slate-400">Total Allocation</span>
+                        <span id="totalAllocation" class="text-sm font-medium">100%</span>
+                    </div>
+                    <div class="h-2 bg-navy-600 rounded-full overflow-hidden">
+                        <div id="allocationBar" class="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full" style="width: 100%"></div>
+                    </div>
+                    <button id="normalizeBtn" class="touch-btn w-full mt-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors">
+                        Auto-Balance to 100%
+                    </button>
+                </div>
+            </div>
+
+            <!-- Positions Tab -->
+            <div id="tab-positions" class="tab-panel hidden">
+                <div id="positionsList" class="space-y-3">
+                    <div class="text-center text-slate-500 py-8">No open positions</div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="tab-settings" class="tab-panel hidden">
+                <!-- Trading Mode -->
+                <div class="bg-navy-700/30 rounded-xl p-4 mb-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h4 class="font-medium">Trading Mode</h4>
+                            <p class="text-sm text-slate-400 mt-0.5">Switch between paper and live trading</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button data-mode="paper" class="mode-btn touch-btn py-3 rounded-xl bg-blue-600 font-medium text-sm transition-colors">
+                            Paper
+                        </button>
+                        <button data-mode="global" class="mode-btn touch-btn py-3 rounded-xl bg-navy-600 font-medium text-sm transition-colors">
+                            Global
+                        </button>
+                        <button data-mode="us" class="mode-btn touch-btn py-3 rounded-xl bg-navy-600 font-medium text-sm transition-colors">
+                            US
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Approval Mode -->
+                <div class="bg-navy-700/30 rounded-xl p-4 mb-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h4 class="font-medium">Manual Approval</h4>
+                            <p class="text-sm text-slate-400 mt-0.5">Review trades before execution</p>
+                        </div>
+                        <div id="approvalToggle" class="toggle-switch"></div>
+                    </div>
+                </div>
+
+                <!-- Reserve Configuration -->
+                <div class="bg-navy-700/30 rounded-xl p-4 mb-4">
+                    <h4 class="font-medium mb-4">Reserve Settings</h4>
+
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm text-slate-400">Reserve Percentage</span>
+                            <span id="reservePctValue" class="text-sm font-medium">0%</span>
+                        </div>
+                        <input type="range" id="reserveSlider" min="0" max="100" value="0" class="w-full">
+                    </div>
+
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <span class="text-sm">Enable Cycling</span>
+                            <p class="text-xs text-slate-500">Auto-return reserve to trading</p>
+                        </div>
+                        <div id="cyclingToggle" class="toggle-switch"></div>
+                    </div>
+
+                    <div id="cyclingOptions" class="hidden">
+                        <div class="mb-3">
+                            <span class="text-sm text-slate-400 block mb-2">Cycle Schedule</span>
+                            <div class="grid grid-cols-3 gap-2">
+                                <button data-schedule="hourly" class="schedule-btn py-2 rounded-lg bg-navy-600 text-sm transition-colors">Hourly</button>
+                                <button data-schedule="daily" class="schedule-btn py-2 rounded-lg bg-navy-600 text-sm transition-colors">Daily</button>
+                                <button data-schedule="weekly" class="schedule-btn py-2 rounded-lg bg-navy-600 text-sm transition-colors">Weekly</button>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm text-slate-400">Cycle Amount</span>
+                                <span id="cyclePctValue" class="text-sm font-medium">10%</span>
+                            </div>
+                            <input type="range" id="cycleSlider" min="1" max="100" value="10" class="w-full">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Risk Profile -->
+                <div class="bg-navy-700/30 rounded-xl p-4 mb-4">
+                    <h4 class="font-medium mb-4">Risk Profile</h4>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button data-risk="conservative" class="risk-btn touch-btn py-3 rounded-xl bg-navy-600 text-sm font-medium transition-colors">
+                            Conservative
+                        </button>
+                        <button data-risk="moderate" class="risk-btn touch-btn py-3 rounded-xl bg-blue-600 text-sm font-medium transition-colors">
+                            Moderate
+                        </button>
+                        <button data-risk="aggressive" class="risk-btn touch-btn py-3 rounded-xl bg-navy-600 text-sm font-medium transition-colors">
+                            Aggressive
+                        </button>
+                    </div>
+                    <div class="mt-4 space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Max Trade</span>
+                            <span id="maxTradePct">15%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Max Wallet</span>
+                            <span id="maxWalletPct">50%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Max Market</span>
+                            <span id="maxMarketPct">15%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Environment Variables (Admin only - Vercel style) -->
+                <div id="envVarsSection" class="bg-navy-700/30 rounded-xl p-4 mb-4 hidden admin-only">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            </svg>
+                            <h4 class="font-medium">Environment Variables</h4>
+                        </div>
+                        <button id="addEnvVarBtn" class="text-blue-400 text-sm hover:text-blue-300 flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Add
+                        </button>
+                    </div>
+
+                    <!-- Rotation Warning Banner -->
+                    <div id="rotationWarning" class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-4 hidden">
+                        <div class="flex items-start gap-2">
+                            <svg class="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <div>
+                                <p class="text-sm text-amber-400 font-medium">Key rotation recommended</p>
+                                <p id="rotationWarningText" class="text-xs text-slate-400 mt-1">Some credentials are over 90 days old</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Env Vars List -->
+                    <div id="envVarsList" class="space-y-2">
+                        <div class="text-center text-slate-500 py-4 text-sm">Loading...</div>
+                    </div>
+
+                    <!-- Info text -->
+                    <p class="text-xs text-slate-500 mt-4 flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Encrypted with AES-256. Rotate every 90 days.
+                    </p>
+                </div>
+
+                <!-- Account Management (Admin only) -->
+                <div id="adminAccountSection" class="bg-navy-700/30 rounded-xl p-4 mb-4 hidden">
+                    <h4 class="font-medium mb-4">Account Management</h4>
+                    <button id="newAccountBtn" class="touch-btn w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-medium transition-colors">
+                        Create New Account
+                    </button>
+                </div>
+
+                <!-- Submit for Review (Viewer only) -->
+                <div id="submitReviewSection" class="bg-gradient-to-r from-blue-600/20 to-purple-600/20 border border-blue-500/30 rounded-xl p-4 mb-4 hidden">
+                    <h4 class="font-medium mb-2">Ready to Apply Changes?</h4>
+                    <p class="text-sm text-slate-400 mb-4">Your changes will be sent to the admin for review and approval.</p>
+
+                    <div id="pendingChanges" class="space-y-2 mb-4">
+                        <!-- Pending changes will be listed here -->
+                    </div>
+
+                    <textarea id="requestReason"
+                        placeholder="Optional: Explain why you're requesting these changes..."
+                        class="w-full bg-navy-800 border border-slate-600 rounded-lg p-3 text-sm text-white placeholder-slate-500 resize-none mb-3"
+                        rows="2"></textarea>
+
+                    <button id="submitRequestBtn" class="touch-btn w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-medium transition-colors">
+                        Submit for Admin Review
+                    </button>
+                </div>
+
+                <!-- My Requests (Viewer only) -->
+                <div id="myRequestsSection" class="bg-navy-700/30 rounded-xl p-4 mb-4 hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="font-medium">My Requests</h4>
+                        <span id="myRequestsCount" class="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-xs font-medium">0</span>
+                    </div>
+                    <div id="myRequestsList" class="space-y-2 max-h-48 overflow-y-auto">
+                        <div class="text-center text-slate-500 py-4 text-sm">No requests yet</div>
+                    </div>
+                </div>
+
+                <!-- Logout -->
+                <button id="logoutBtn" class="touch-btn w-full py-3 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-xl font-medium transition-colors">
+                    Sign Out
+                </button>
+            </div>
+
+            <!-- Admin Tab (Operator only) -->
+            <div id="tab-admin" class="tab-panel hidden">
+                <!-- Admin Overview -->
+                <div class="bg-gradient-to-r from-emerald-600/20 to-blue-600/20 border border-emerald-500/30 rounded-xl p-4 mb-4">
+                    <h4 class="font-medium mb-3">Admin Dashboard</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-navy-800/50 rounded-lg p-3 text-center">
+                            <div id="adminPendingTrades" class="text-2xl font-bold text-amber-400">0</div>
+                            <div class="text-xs text-slate-400">Pending Trades</div>
+                        </div>
+                        <div class="bg-navy-800/50 rounded-lg p-3 text-center">
+                            <div id="adminPendingRequests" class="text-2xl font-bold text-blue-400">0</div>
+                            <div class="text-xs text-slate-400">Settings Requests</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pending Settings Requests -->
+                <div class="bg-navy-700/30 rounded-xl p-4 mb-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="font-medium">Pending Requests</h4>
+                        <button id="refreshRequestsBtn" class="text-blue-400 text-sm hover:text-blue-300">Refresh</button>
+                    </div>
+                    <div id="adminRequestsList" class="space-y-3">
+                        <div class="text-center text-slate-500 py-4 text-sm">No pending requests</div>
+                    </div>
+                </div>
+
+                <!-- Trading Status & Activation -->
+                <div id="tradingStatusCard" class="bg-gradient-to-r from-amber-600/20 to-orange-600/20 border border-amber-500/30 rounded-xl p-4 mb-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-3">
+                            <div id="tradingStatusDot" class="w-3 h-3 rounded-full bg-amber-500 animate-pulse"></div>
+                            <div>
+                                <div class="font-medium">Trading Status</div>
+                                <div id="tradingStatusText" class="text-sm text-slate-400">Paper Mode</div>
+                            </div>
+                        </div>
+                        <button id="goLiveBtn" class="touch-btn px-4 py-2 bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 rounded-lg font-medium text-sm transition-colors shadow-lg">
+                            Go Live
+                        </button>
+                    </div>
+                    <p id="tradingStatusDesc" class="text-xs text-slate-500">Trades are simulated. Click "Go Live" to activate real trading.</p>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="bg-navy-700/30 rounded-xl p-4 mb-4">
+                    <h4 class="font-medium mb-4">Quick Actions</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="adminApproveAllTrades" class="touch-btn py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-sm font-medium transition-colors">
+                            Approve All Trades
+                        </button>
+                        <button id="adminRejectAllTrades" class="touch-btn py-3 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-xl text-sm font-medium transition-colors">
+                            Reject All Trades
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="bg-navy-700/30 rounded-xl p-4">
+                    <h4 class="font-medium mb-4">Recent Activity</h4>
+                    <div id="adminActivityList" class="space-y-2 max-h-64 overflow-y-auto">
+                        <div class="text-center text-slate-500 py-4 text-sm">Loading activity...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav fixed bottom-0 left-0 right-0 bg-navy-900/95 backdrop-blur-sm border-t border-slate-700/50 z-50">
+        <div class="flex justify-around py-2">
+            <button data-nav="dashboard" class="nav-btn touch-btn flex flex-col items-center py-2 px-6 text-blue-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+                </svg>
+                <span class="text-xs mt-1">Dashboard</span>
+            </button>
+            <button data-nav="accounts" class="nav-btn touch-btn flex flex-col items-center py-2 px-6 text-slate-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
+                <span class="text-xs mt-1">Accounts</span>
+            </button>
+            <button data-nav="wallets" class="nav-btn touch-btn flex flex-col items-center py-2 px-6 text-slate-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                </svg>
+                <span class="text-xs mt-1">Wallets</span>
+            </button>
+            <button data-nav="settings" class="nav-btn touch-btn flex flex-col items-center py-2 px-6 text-slate-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <span class="text-xs mt-1">Settings</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Create Account Modal -->
+    <div id="createAccountModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-navy-800 rounded-2xl w-full max-w-md shadow-2xl border border-slate-600/30 overflow-hidden">
+            <div class="p-6 border-b border-slate-700/50">
+                <h2 class="text-lg font-semibold text-white">New Trading Account</h2>
+                <p class="text-sm text-slate-400 mt-1">Create a new account instance</p>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Account Name</label>
+                    <input id="newAccountName" type="text" placeholder="e.g. Polymarket Aggressive" class="w-full bg-navy-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Description</label>
+                    <input id="newAccountDesc" type="text" placeholder="Optional description" class="w-full bg-navy-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Account Type</label>
+                    <select id="newAccountType" class="w-full bg-navy-700 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                        <option value="trading">Trading</option>
+                        <option value="charity">Charity</option>
+                        <option value="savings">Savings</option>
+                        <option value="family">Family</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Starting Balance (USDC)</label>
+                    <input id="newAccountBalance" type="number" step="0.01" min="0" value="0" class="w-full bg-navy-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-2">Risk Level</label>
+                    <div class="flex gap-2">
+                        <button data-risk-new="conservative" class="new-risk-btn flex-1 py-2 rounded-lg text-sm font-medium bg-navy-600 text-slate-300 transition-colors">Conservative</button>
+                        <button data-risk-new="moderate" class="new-risk-btn flex-1 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white transition-colors">Moderate</button>
+                        <button data-risk-new="aggressive" class="new-risk-btn flex-1 py-2 rounded-lg text-sm font-medium bg-navy-600 text-slate-300 transition-colors">Aggressive</button>
+                    </div>
+                </div>
+            </div>
+            <div class="p-6 border-t border-slate-700/50 flex gap-3">
+                <button id="cancelCreateAccount" class="flex-1 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl font-medium transition-colors">Cancel</button>
+                <button id="confirmCreateAccount" class="flex-1 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-medium transition-colors">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Detail Modal -->
+    <div id="accountDetailModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-navy-800 rounded-2xl w-full max-w-md shadow-2xl border border-slate-600/30 overflow-hidden max-h-[85vh] overflow-y-auto">
+            <div id="accountDetailContent" class="p-6">
+                <!-- Filled dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="modalOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-end justify-center">
+        <div id="modalContent" class="bg-navy-800 rounded-t-3xl w-full max-w-lg p-6 transform translate-y-full transition-transform duration-300">
+            <!-- Modal content inserted dynamically -->
+        </div>
+    </div>
+
+    <!-- Activation Modal (First-time setup for operators) -->
+    <div id="activationModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] hidden flex items-center justify-center p-4">
+        <div class="bg-gradient-to-br from-navy-800 to-navy-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-600/30 overflow-hidden">
+            <!-- Header with icon -->
+            <div class="bg-gradient-to-r from-emerald-600/20 to-blue-600/20 p-6 text-center border-b border-slate-700/50">
+                <div class="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-emerald-500 to-blue-500 rounded-full flex items-center justify-center">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+                <h2 class="text-2xl font-bold text-white">Ready to Go Live?</h2>
+                <p class="text-slate-400 mt-2">Your trading account is configured and ready</p>
+            </div>
+
+            <!-- Account summary -->
+            <div class="p-6 space-y-4">
+                <div class="bg-navy-700/50 rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-slate-400 text-sm">Account</span>
+                        <span id="activationAccountName" class="font-semibold text-white">Main</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-400 text-sm">Balance</span>
+                        <span id="activationBalance" class="font-semibold text-emerald-400">$10,000.00</span>
+                    </div>
+                </div>
+
+                <!-- What will happen -->
+                <div class="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+                    <h4 class="font-medium text-blue-400 mb-2 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        This will:
+                    </h4>
+                    <ul class="text-sm text-slate-300 space-y-1">
+                        <li class="flex items-center gap-2">
+                            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Switch from Paper to Live trading
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Enable auto-trading
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Execute real orders with real funds
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Note about toggling -->
+                <p class="text-xs text-slate-500 text-center">
+                    You can switch back to Paper mode anytime from the Admin tab.
+                </p>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="p-6 pt-2 flex gap-3">
+                <button id="activationDenyBtn" class="flex-1 touch-btn py-4 px-6 bg-slate-700 hover:bg-slate-600 active:bg-slate-500 rounded-xl font-semibold text-white transition-colors">
+                    Not Yet
+                </button>
+                <button id="activationApproveBtn" class="flex-1 touch-btn py-4 px-6 bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 active:from-emerald-400 active:to-blue-400 rounded-xl font-semibold text-white transition-colors shadow-lg shadow-emerald-500/25">
+                    Go Live
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Environment Variable Modal (Vercel-style) -->
+    <div id="envVarModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] hidden overflow-y-auto">
+        <div class="min-h-full flex items-start justify-center p-4 pt-8 pb-8">
+            <div class="bg-gradient-to-br from-navy-800 to-navy-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-600/30">
+                <!-- Header -->
+                <div class="flex items-center justify-between p-4 border-b border-slate-700/50">
+                    <h3 id="envVarModalTitle" class="font-semibold">Add Environment Variable</h3>
+                    <button id="closeEnvVarBtn" class="touch-btn p-2 rounded-lg hover:bg-slate-700/50 transition-colors">
+                        <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Form -->
+                <div class="p-4 space-y-4">
+                    <!-- Key selector -->
+                    <div class="space-y-1">
+                        <label class="text-xs text-slate-400">Key</label>
+                        <select id="envVarKey" class="w-full bg-navy-700 border border-slate-600 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition-colors">
+                            <option value="">Select a variable...</option>
+                            <option value="POLY_API_KEY">POLY_API_KEY</option>
+                            <option value="POLY_API_SECRET">POLY_API_SECRET</option>
+                            <option value="POLY_API_PASSPHRASE">POLY_API_PASSPHRASE</option>
+                            <option value="POLY_PRIVATE_KEY">POLY_PRIVATE_KEY</option>
+                        </select>
+                    </div>
+
+                    <!-- Value input -->
+                    <div class="space-y-1">
+                        <label class="text-xs text-slate-400 flex items-center justify-between">
+                            <span>Value</span>
+                            <button id="toggleEnvVarVisibility" class="text-slate-500 hover:text-slate-300">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                            </button>
+                        </label>
+                        <input type="password" id="envVarValue" placeholder="Enter value..."
+                            class="w-full bg-navy-700 border border-slate-600 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-blue-500 transition-colors">
+                    </div>
+
+                    <!-- Key descriptions -->
+                    <div id="envVarDescription" class="bg-navy-700/50 rounded-lg p-3 text-xs text-slate-400 hidden">
+                        <p id="envVarDescText"></p>
+                    </div>
+                </div>
+
+                <!-- Info -->
+                <div class="px-4 pb-4">
+                    <div class="bg-slate-800/50 rounded-lg p-3 flex items-start gap-2">
+                        <svg class="w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <p class="text-xs text-slate-500">Values are encrypted before storage. Best practice: rotate keys every 90 days.</p>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="p-4 pt-0 flex gap-3">
+                    <button id="cancelEnvVarBtn" class="flex-1 touch-btn py-3 bg-slate-700 hover:bg-slate-600 rounded-xl font-medium transition-colors">
+                        Cancel
+                    </button>
+                    <button id="saveEnvVarBtn" class="flex-1 touch-btn py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-medium transition-colors">
+                        Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/swipe.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
