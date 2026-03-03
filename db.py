@@ -1354,6 +1354,64 @@ def get_settlement_dashboard() -> dict:
     }
 
 
+def migrate_allocations_to_pending() -> dict:
+    """
+    Migrate existing allocation fund balances to the new settlement policy.
+
+    Moves funds from allocation funds (charity/savings/family) back to main,
+    and creates pending settlements so they remain tradable until 3hrs before distribution.
+
+    Returns migration results.
+    """
+    from datetime import datetime, timedelta
+    from config import SETTLEMENT_HOURS_BEFORE
+
+    now = datetime.now()
+    results = {"migrated": [], "total_moved": 0}
+
+    for fund_id in ["charity", "savings", "family"]:
+        fund_balance = get_fund_balance(fund_id)
+        if fund_balance < 0.01:
+            continue
+
+        # Move funds back to main
+        main_balance = get_fund_balance("main")
+        update_fund_balance("main", main_balance + fund_balance)
+        update_fund_balance(fund_id, 0)
+
+        # Create pending settlement (funds now tradable until settle_at)
+        distribute_at = now + timedelta(hours=24)
+        settle_at = distribute_at - timedelta(hours=SETTLEMENT_HOURS_BEFORE)
+
+        with get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO pending_settlements
+                    (fund_id, amount, full_moon_date, status, settle_at, distribute_at)
+                VALUES (?, ?, 'migration', 'pending', ?, ?)
+                """,
+                (fund_id, fund_balance, settle_at.isoformat(), distribute_at.isoformat()),
+            )
+
+        results["migrated"].append({
+            "fund_id": fund_id,
+            "amount": round(fund_balance, 2),
+            "settle_at": settle_at.isoformat(),
+            "distribute_at": distribute_at.isoformat(),
+        })
+        results["total_moved"] += fund_balance
+
+        log.info(
+            "Migration: %s $%.2f → main (pending until %s)",
+            fund_id, fund_balance, settle_at.strftime("%H:%M")
+        )
+
+    results["total_moved"] = round(results["total_moved"], 2)
+    results["new_main_balance"] = round(get_fund_balance("main"), 2)
+
+    return results
+
+
 def get_harvest_history(limit: int = 20) -> list[dict]:
     """Get recent harvest history."""
     with get_conn() as conn:
