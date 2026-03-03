@@ -661,6 +661,20 @@
                 </div>
             </div>
             <div class="text-[10px] text-slate-500 mt-2 text-center">Funds compound in pool until harvest</div>
+            ${harvest.settlement && (harvest.settlement.pending_tradable > 0 || harvest.settlement.settled_locked > 0) ? `
+            <div class="mt-2 pt-2 border-t border-indigo-500/20">
+                <div class="grid grid-cols-2 gap-2 text-center">
+                    <div>
+                        <div class="text-[10px] text-slate-500">In Pool</div>
+                        <div class="text-xs font-semibold text-blue-400">$${(harvest.settlement.pending_tradable || 0).toFixed(2)}</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] text-slate-500">Locked</div>
+                        <div class="text-xs font-semibold text-amber-400">$${(harvest.settlement.settled_locked || 0).toFixed(2)}</div>
+                    </div>
+                </div>
+                ${harvest.settlement.next_settlement ? `<div class="text-[10px] text-slate-600 mt-1 text-center">Settles: ${new Date(harvest.settlement.next_settlement).toLocaleString()}</div>` : ''}
+            </div>` : ''}
         </div>`;
 
         // Summary bar

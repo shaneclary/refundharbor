@@ -922,11 +922,10 @@ def trigger_full_moon_harvest() -> dict:
 
     Returns dict with harvest results.
     """
-    from full_moon import get_full_moon_for_date, is_full_moon_day
+    from full_moon import get_full_moon_for_date, is_full_moon_day, PACIFIC
     from datetime import datetime
-    from zoneinfo import ZoneInfo
 
-    now = datetime.now(ZoneInfo("America/Los_Angeles"))
+    now = datetime.now(PACIFIC)
     full_moon_date = get_full_moon_for_date(now)
 
     if not full_moon_date:

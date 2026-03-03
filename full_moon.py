@@ -196,13 +196,31 @@ def get_harvest_time_for_date(date_str: str) -> str | None:
 
 def is_harvest_time(tolerance_minutes: int = 30) -> bool:
     """
-    Check if we're within the harvest window (near moon transit).
+    Check if we're within the harvest window.
+
+    The harvest window is open anytime on the full moon day.
+    The 'harvest_ready' flag indicates if we're near the transit (moon's peak),
+    which is the ideal moment, but harvest can happen anytime on the day.
 
     Args:
-        tolerance_minutes: Minutes before/after transit to consider valid
+        tolerance_minutes: Minutes before/after transit for 'ideal' harvest
 
     Returns:
-        True if current time is within tolerance of moon transit on full moon day
+        True if it's a full moon day (harvest is allowed)
+    """
+    now = datetime.now(PACIFIC)
+    return is_full_moon_day(now)
+
+
+def is_harvest_ideal(tolerance_minutes: int = 30) -> bool:
+    """
+    Check if we're at the ideal harvest time (near moon transit).
+
+    Args:
+        tolerance_minutes: Minutes before/after transit to consider ideal
+
+    Returns:
+        True if within tolerance of moon transit
     """
     now = datetime.now(PACIFIC)
 
@@ -213,20 +231,15 @@ def is_harvest_time(tolerance_minutes: int = 30) -> bool:
     transit_time = get_harvest_time_for_date(date_str)
 
     if not transit_time:
-        # No NASA data - fall back to any time on full moon day
-        return True
+        return True  # No NASA data - any time is fine
 
-    # Parse transit time and compare
     try:
         hour, minute = map(int, transit_time.split(":"))
         transit_dt = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-
-        # Handle overnight transits (e.g., 00:08 is technically next day)
-        # If transit is past midnight but we're before midnight, adjust
         delta = abs((now - transit_dt).total_seconds() / 60)
         return delta <= tolerance_minutes
     except Exception:
-        return True  # Fall back to any time on full moon day
+        return True
 
 
 def get_harvest_status() -> dict:
@@ -242,23 +255,32 @@ def get_harvest_status() -> dict:
     next_moon = get_next_full_moon(now)
     recent_moon = get_current_or_recent_full_moon(within_hours=24)
 
-    # Get transit time for next/current full moon
-    next_date_str = next_moon.strftime("%Y-%m-%d")
-    transit_time = get_harvest_time_for_date(next_date_str)
-
     is_moon_day = is_full_moon_day(now)
-    harvest_ready = is_harvest_time() if is_moon_day else False
+
+    # Get transit time - use today's if it's a full moon day, otherwise next
+    if is_moon_day:
+        transit_date_str = now.strftime("%Y-%m-%d")
+    else:
+        transit_date_str = next_moon.strftime("%Y-%m-%d")
+    next_date_str = next_moon.strftime("%Y-%m-%d")
+    transit_time = get_harvest_time_for_date(transit_date_str)
+    can_harvest = is_harvest_time() if is_moon_day else False
+    is_ideal = is_harvest_ideal() if is_moon_day else False
+
+    # On full moon day, show 0 days until harvest (not 29 to next)
+    days_until = 0 if is_moon_day else get_days_until_full_moon()
 
     return {
         "is_full_moon_day": is_moon_day,
-        "days_until_full_moon": get_days_until_full_moon(),
+        "days_until_full_moon": days_until,
         "next_full_moon": next_moon.strftime("%Y-%m-%d %H:%M PST"),
-        "next_full_moon_date": next_date_str,
+        "next_full_moon_date": now.strftime("%Y-%m-%d") if is_moon_day else next_date_str,
         "transit_time": transit_time,  # When moon is at peak (highest point)
         "current_time_pst": now.strftime("%Y-%m-%d %H:%M PST"),
         "recent_full_moon": recent_moon.strftime("%Y-%m-%d") if recent_moon else None,
         "harvest_window_open": recent_moon is not None,
-        "harvest_ready": harvest_ready,  # True if within 30min of transit
+        "harvest_ready": can_harvest,  # True if it's full moon day
+        "harvest_ideal": is_ideal,  # True if within 30min of transit (peak)
     }
 
 
