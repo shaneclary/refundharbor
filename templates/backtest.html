@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backtesting - DenseWealth</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: { 900: '#0a0f1a', 800: '#111827', 700: '#1a2332', 600: '#243042' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { font-family: 'Inter', system-ui, sans-serif; }
+        body { background: linear-gradient(180deg, #0a0f1a 0%, #111827 100%); min-height: 100vh; }
+    </style>
+</head>
+<body class="text-white">
+    <!-- Header -->
+    <header class="sticky top-0 z-40 bg-navy-900/95 backdrop-blur-sm border-b border-slate-700/50">
+        <div class="flex items-center justify-between px-4 py-3 max-w-6xl mx-auto">
+            <div class="flex items-center gap-3">
+                <a href="/" class="text-slate-400 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <h1 class="font-semibold text-lg">Backtesting</h1>
+            </div>
+            <a href="/strategies" class="text-sm text-blue-400 hover:text-blue-300">Manage Strategies</a>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-6">
+        <!-- Input Form -->
+        <div class="bg-navy-700/30 rounded-xl p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4">Backtest Configuration</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Trader Wallet (optional)</label>
+                    <input id="traderWallet" type="text" placeholder="0x... or leave empty for all"
+                        class="w-full bg-navy-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Timeframe</label>
+                    <select id="timeframe" class="w-full bg-navy-700 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                        <option value="24">Last 24 hours</option>
+                        <option value="72">Last 3 days</option>
+                        <option value="168" selected>Last 7 days</option>
+                        <option value="336">Last 14 days</option>
+                        <option value="720">Last 30 days</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Strategy</label>
+                    <select id="strategySelect" class="w-full bg-navy-700 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                        <option value="">No strategy (defaults)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Starting Balance</label>
+                    <input id="startingBalance" type="number" value="1000" min="1"
+                        class="w-full bg-navy-700 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Max Trade %</label>
+                    <input id="maxTradePct" type="number" value="15" min="1" max="100"
+                        class="w-full bg-navy-700 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Max Wallet %</label>
+                    <input id="maxWalletPct" type="number" value="50" min="1" max="100"
+                        class="w-full bg-navy-700 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Slippage (bps)</label>
+                    <input id="slippageBps" type="number" value="10" min="0" max="1000"
+                        class="w-full bg-navy-700 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-6">
+                <button id="runBacktestBtn" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium transition-colors">
+                    Run Backtest
+                </button>
+                <label class="flex items-center gap-2 text-sm text-slate-400">
+                    <input type="checkbox" id="saveResult" class="form-checkbox rounded bg-navy-600 border-slate-500">
+                    Save result
+                </label>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="hidden text-center py-12">
+            <div class="inline-block w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+            <p class="text-slate-400 mt-4">Running backtest...</p>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden">
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-navy-700/30 rounded-xl p-4">
+                    <div class="text-sm text-slate-400">Final Balance</div>
+                    <div id="resultBalance" class="text-2xl font-bold text-white mt-1">$0.00</div>
+                </div>
+                <div class="bg-navy-700/30 rounded-xl p-4">
+                    <div class="text-sm text-slate-400">Total P&L</div>
+                    <div id="resultPnl" class="text-2xl font-bold mt-1">$0.00</div>
+                </div>
+                <div class="bg-navy-700/30 rounded-xl p-4">
+                    <div class="text-sm text-slate-400">Win Rate</div>
+                    <div id="resultWinRate" class="text-2xl font-bold text-emerald-400 mt-1">0%</div>
+                </div>
+                <div class="bg-navy-700/30 rounded-xl p-4">
+                    <div class="text-sm text-slate-400">Max Drawdown</div>
+                    <div id="resultDrawdown" class="text-2xl font-bold text-red-400 mt-1">0%</div>
+                </div>
+            </div>
+
+            <!-- Advanced Metrics -->
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+                <div class="bg-navy-700/30 rounded-lg p-3 text-center">
+                    <div class="text-xs text-slate-400">Profit Factor</div>
+                    <div id="resultProfitFactor" class="text-lg font-semibold mt-1">0.00</div>
+                </div>
+                <div class="bg-navy-700/30 rounded-lg p-3 text-center">
+                    <div class="text-xs text-slate-400">Sharpe Ratio</div>
+                    <div id="resultSharpe" class="text-lg font-semibold mt-1">0.00</div>
+                </div>
+                <div class="bg-navy-700/30 rounded-lg p-3 text-center">
+                    <div class="text-xs text-slate-400">Sortino Ratio</div>
+                    <div id="resultSortino" class="text-lg font-semibold mt-1">0.00</div>
+                </div>
+                <div class="bg-navy-700/30 rounded-lg p-3 text-center">
+                    <div class="text-xs text-slate-400">Total Trades</div>
+                    <div id="resultTrades" class="text-lg font-semibold mt-1">0</div>
+                </div>
+                <div class="bg-navy-700/30 rounded-lg p-3 text-center">
+                    <div class="text-xs text-slate-400">Wins / Losses</div>
+                    <div id="resultWinLoss" class="text-lg font-semibold mt-1">0 / 0</div>
+                </div>
+                <div class="bg-navy-700/30 rounded-lg p-3 text-center">
+                    <div class="text-xs text-slate-400">Return %</div>
+                    <div id="resultReturnPct" class="text-lg font-semibold mt-1">0%</div>
+                </div>
+            </div>
+
+            <!-- Equity Curve Chart -->
+            <div class="bg-navy-700/30 rounded-xl p-6 mb-6">
+                <h3 class="text-lg font-semibold mb-4">Equity Curve</h3>
+                <div class="h-64">
+                    <canvas id="equityChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Trade Table -->
+            <div class="bg-navy-700/30 rounded-xl p-6">
+                <h3 class="text-lg font-semibold mb-4">Trade History</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-slate-400 border-b border-slate-700">
+                                <th class="text-left py-2 px-3">Time</th>
+                                <th class="text-left py-2 px-3">Side</th>
+                                <th class="text-left py-2 px-3">Market</th>
+                                <th class="text-right py-2 px-3">Price</th>
+                                <th class="text-right py-2 px-3">Shares</th>
+                                <th class="text-right py-2 px-3">USDC</th>
+                                <th class="text-right py-2 px-3">P&L</th>
+                                <th class="text-right py-2 px-3">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tradeTableBody" class="divide-y divide-slate-700/50">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Saved Results -->
+        <div id="savedResultsSection" class="mt-8">
+            <h2 class="text-lg font-semibold mb-4">Saved Results</h2>
+            <div id="savedResultsList" class="space-y-2">
+                <p class="text-slate-500 text-sm">No saved results yet</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let equityChart = null;
+        let strategies = [];
+
+        async function fetchAPI(url, options = {}) {
+            const res = await fetch(url, {
+                ...options,
+                headers: { 'Content-Type': 'application/json', ...options.headers }
+            });
+            return res.json();
+        }
+
+        async function loadStrategies() {
+            const data = await fetchAPI('/api/strategies');
+            strategies = data.strategies || [];
+            const select = document.getElementById('strategySelect');
+            select.innerHTML = '<option value="">No strategy (defaults)</option>' +
+                strategies.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+            // Check URL params
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('strategy_id')) {
+                select.value = params.get('strategy_id');
+            }
+        }
+
+        async function loadSavedResults() {
+            const data = await fetchAPI('/api/backtest/results?limit=10');
+            const list = document.getElementById('savedResultsList');
+
+            if (!data.results || data.results.length === 0) {
+                list.innerHTML = '<p class="text-slate-500 text-sm">No saved results yet</p>';
+                return;
+            }
+
+            list.innerHTML = data.results.map(r => `
+                <div class="bg-navy-700/30 rounded-lg p-4 flex items-center justify-between hover:bg-navy-700/50 cursor-pointer" onclick="loadResult(${r.id})">
+                    <div>
+                        <div class="font-medium">${r.trader_wallet ? r.trader_wallet.slice(0, 10) + '...' : 'All Traders'}</div>
+                        <div class="text-sm text-slate-400">${new Date(r.created_at).toLocaleString()}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="${r.total_pnl >= 0 ? 'text-emerald-400' : 'text-red-400'} font-semibold">$${r.total_pnl.toFixed(2)}</div>
+                        <div class="text-sm text-slate-400">${r.win_rate.toFixed(1)}% win rate</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function runBacktest() {
+            const traderWallet = document.getElementById('traderWallet').value.trim() || null;
+            const hours = parseInt(document.getElementById('timeframe').value);
+            const strategyId = document.getElementById('strategySelect').value || null;
+            const startingBalance = parseFloat(document.getElementById('startingBalance').value);
+            const maxTradePct = parseFloat(document.getElementById('maxTradePct').value) / 100;
+            const maxWalletPct = parseFloat(document.getElementById('maxWalletPct').value) / 100;
+            const slippageBps = parseFloat(document.getElementById('slippageBps').value);
+            const saveResult = document.getElementById('saveResult').checked;
+
+            document.getElementById('loadingState').classList.remove('hidden');
+            document.getElementById('resultsSection').classList.add('hidden');
+
+            try {
+                const data = await fetchAPI('/api/backtest', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        hours,
+                        trader_wallet: traderWallet,
+                        strategy_id: strategyId ? parseInt(strategyId) : null,
+                        starting_balance: startingBalance,
+                        max_trade_pct: maxTradePct,
+                        max_wallet_pct: maxWalletPct,
+                        max_market_pct: 0.15,
+                        slippage_bps: slippageBps,
+                        save_result: saveResult
+                    })
+                });
+
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                displayResults(data);
+                if (saveResult) loadSavedResults();
+            } finally {
+                document.getElementById('loadingState').classList.add('hidden');
+            }
+        }
+
+        function displayResults(data) {
+            const s = data.summary;
+
+            document.getElementById('resultBalance').textContent = `$${s.final_balance.toFixed(2)}`;
+            document.getElementById('resultPnl').textContent = `${s.total_pnl >= 0 ? '+' : ''}$${s.total_pnl.toFixed(2)}`;
+            document.getElementById('resultPnl').className = `text-2xl font-bold mt-1 ${s.total_pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+            document.getElementById('resultWinRate').textContent = `${s.win_rate.toFixed(1)}%`;
+            document.getElementById('resultDrawdown').textContent = `${s.max_drawdown_pct.toFixed(1)}%`;
+
+            document.getElementById('resultProfitFactor').textContent = s.profit_factor.toFixed(2);
+            document.getElementById('resultSharpe').textContent = s.sharpe_ratio.toFixed(2);
+            document.getElementById('resultSortino').textContent = s.sortino_ratio.toFixed(2);
+            document.getElementById('resultTrades').textContent = s.total_trades;
+            document.getElementById('resultWinLoss').textContent = `${s.winning_trades} / ${s.losing_trades}`;
+            document.getElementById('resultReturnPct').textContent = `${s.pnl_pct.toFixed(1)}%`;
+            document.getElementById('resultReturnPct').className = `text-lg font-semibold mt-1 ${s.pnl_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+
+            // Render equity chart
+            renderEquityChart(data.equity_curve);
+
+            // Render trade table
+            const tbody = document.getElementById('tradeTableBody');
+            tbody.innerHTML = data.trades.map(t => `
+                <tr class="hover:bg-navy-700/30">
+                    <td class="py-2 px-3 text-slate-400">${t.timestamp}</td>
+                    <td class="py-2 px-3">
+                        <span class="px-2 py-0.5 rounded ${t.side === 'BUY' ? 'bg-emerald-500/20 text-emerald-400' : t.side === 'SELL' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'} text-xs">
+                            ${t.side}
+                        </span>
+                    </td>
+                    <td class="py-2 px-3 font-mono text-sm">${t.market_id}</td>
+                    <td class="py-2 px-3 text-right">${t.price.toFixed(4)}</td>
+                    <td class="py-2 px-3 text-right">${t.shares.toFixed(4)}</td>
+                    <td class="py-2 px-3 text-right">$${t.usdc.toFixed(2)}</td>
+                    <td class="py-2 px-3 text-right ${t.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}">
+                        ${t.pnl !== 0 ? (t.pnl >= 0 ? '+' : '') + '$' + t.pnl.toFixed(2) : '-'}
+                    </td>
+                    <td class="py-2 px-3 text-right font-medium">$${t.balance_after.toFixed(2)}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('resultsSection').classList.remove('hidden');
+        }
+
+        function renderEquityChart(curve) {
+            const ctx = document.getElementById('equityChart').getContext('2d');
+
+            if (equityChart) equityChart.destroy();
+
+            const labels = curve.map(p => p.timestamp);
+            const balances = curve.map(p => p.balance);
+            const drawdowns = curve.map(p => -p.drawdown);
+
+            equityChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Balance',
+                            data: balances,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Drawdown',
+                            data: drawdowns,
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: { labels: { color: '#94a3b8' } }
+                    },
+                    scales: {
+                        x: {
+                            display: false
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            grid: { color: 'rgba(100, 116, 139, 0.1)' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function loadResult(id) {
+            const data = await fetchAPI(`/api/backtest/results/${id}`);
+            if (data.error) return alert(data.error);
+
+            if (data.parsed_data) {
+                displayResults({
+                    summary: data.parsed_data.metrics || {},
+                    equity_curve: data.parsed_data.equity_curve || [],
+                    trades: []
+                });
+            }
+        }
+
+        // Event listeners
+        document.getElementById('runBacktestBtn').onclick = runBacktest;
+
+        // Initialize
+        loadStrategies();
+        loadSavedResults();
+    </script>
+</body>
+</html>

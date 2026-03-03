@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trader Discovery - DenseWealth</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: { 900: '#0a0f1a', 800: '#111827', 700: '#1a2332', 600: '#243042' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { font-family: 'Inter', system-ui, sans-serif; }
+        body { background: linear-gradient(180deg, #0a0f1a 0%, #111827 100%); min-height: 100vh; }
+    </style>
+</head>
+<body class="text-white">
+    <!-- Header -->
+    <header class="sticky top-0 z-40 bg-navy-900/95 backdrop-blur-sm border-b border-slate-700/50">
+        <div class="flex items-center justify-between px-4 py-3 max-w-6xl mx-auto">
+            <div class="flex items-center gap-3">
+                <a href="/" class="text-slate-400 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <h1 class="font-semibold text-lg">Trader Discovery</h1>
+            </div>
+            <button id="refreshBtn" class="p-2 rounded-lg hover:bg-slate-700/50 active:bg-slate-600/50 transition-colors">
+                <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 py-6">
+        <!-- Filters -->
+        <div class="bg-navy-700/30 rounded-xl p-4 mb-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Period</label>
+                    <select id="periodFilter" class="w-full bg-navy-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                        <option value="24h">Last 24 hours</option>
+                        <option value="7d" selected>Last 7 days</option>
+                        <option value="30d">Last 30 days</option>
+                        <option value="all">All time</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Min Win Rate</label>
+                    <select id="winRateFilter" class="w-full bg-navy-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                        <option value="0">Any</option>
+                        <option value="50">50%+</option>
+                        <option value="55">55%+</option>
+                        <option value="60">60%+</option>
+                        <option value="70">70%+</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Min PnL</label>
+                    <select id="pnlFilter" class="w-full bg-navy-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                        <option value="0">Any</option>
+                        <option value="100">$100+</option>
+                        <option value="500">$500+</option>
+                        <option value="1000">$1,000+</option>
+                        <option value="10000">$10,000+</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Limit</label>
+                    <select id="limitFilter" class="w-full bg-navy-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                        <option value="25">25</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+            </div>
+            <button id="applyFiltersBtn" class="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium transition-colors">
+                Apply Filters
+            </button>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="hidden text-center py-12">
+            <div class="inline-block w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+            <p class="text-slate-400 mt-4">Loading leaderboard...</p>
+        </div>
+
+        <!-- Leaderboard Table -->
+        <div id="leaderboardSection" class="bg-navy-700/30 rounded-xl overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-700/50">
+                <h2 class="font-semibold">Top Traders</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-slate-400 border-b border-slate-700 bg-navy-800/50">
+                            <th class="text-left py-3 px-4">#</th>
+                            <th class="text-left py-3 px-4">Trader</th>
+                            <th class="text-right py-3 px-4">PnL</th>
+                            <th class="text-right py-3 px-4">Volume</th>
+                            <th class="text-right py-3 px-4">Win Rate</th>
+                            <th class="text-right py-3 px-4">W / L</th>
+                            <th class="text-center py-3 px-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboardBody" class="divide-y divide-slate-700/50">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Trader Detail Modal -->
+        <div id="traderModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-navy-800 rounded-2xl w-full max-w-lg shadow-2xl border border-slate-600/30 max-h-[80vh] overflow-y-auto">
+                <div class="p-6 border-b border-slate-700/50">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 id="modalUsername" class="text-lg font-semibold">Trader Analysis</h2>
+                            <p id="modalWallet" class="text-sm text-slate-400 font-mono"></p>
+                        </div>
+                        <button id="closeModal" class="p-2 rounded-lg hover:bg-slate-700/50">
+                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="modalContent" class="p-6">
+                    <div class="text-center py-8">
+                        <div class="inline-block w-6 h-6 border-3 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+                        <p class="text-slate-400 mt-2 text-sm">Analyzing trader...</p>
+                    </div>
+                </div>
+                <div class="p-6 border-t border-slate-700/50 flex gap-3">
+                    <button id="trackTraderBtn" class="flex-1 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-medium transition-colors">
+                        Add to Tracked
+                    </button>
+                    <button id="backtestTraderBtn" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-medium transition-colors">
+                        Run Backtest
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let traders = [];
+        let currentWallet = null;
+
+        async function fetchAPI(url, options = {}) {
+            const res = await fetch(url, {
+                ...options,
+                headers: { 'Content-Type': 'application/json', ...options.headers }
+            });
+            return res.json();
+        }
+
+        async function loadLeaderboard() {
+            const period = document.getElementById('periodFilter').value;
+            const minWinRate = parseFloat(document.getElementById('winRateFilter').value);
+            const minPnl = parseFloat(document.getElementById('pnlFilter').value);
+            const limit = parseInt(document.getElementById('limitFilter').value);
+
+            document.getElementById('loadingState').classList.remove('hidden');
+            document.getElementById('leaderboardSection').classList.add('hidden');
+
+            try {
+                const data = await fetchAPI(`/api/traders/leaderboard?period=${period}&limit=${limit}&min_win_rate=${minWinRate}`);
+                traders = data.traders || [];
+
+                // Filter by PnL client-side
+                if (minPnl > 0) {
+                    traders = traders.filter(t => t.pnl >= minPnl);
+                }
+
+                renderLeaderboard();
+            } finally {
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('leaderboardSection').classList.remove('hidden');
+            }
+        }
+
+        function renderLeaderboard() {
+            const tbody = document.getElementById('leaderboardBody');
+
+            if (traders.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center py-12 text-slate-500">
+                            No traders found matching your criteria
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = traders.map((t, i) => {
+                const wins = t.win_count || 0;
+                const losses = t.loss_count || 0;
+                const total = wins + losses;
+                const winRate = total > 0 ? (wins / total * 100).toFixed(1) : 0;
+                const pnlColor = t.pnl >= 0 ? 'text-emerald-400' : 'text-red-400';
+
+                return `
+                    <tr class="hover:bg-navy-700/30 cursor-pointer" onclick="showTraderDetail('${t.wallet_address}')">
+                        <td class="py-3 px-4 text-slate-400">${t.rank || i + 1}</td>
+                        <td class="py-3 px-4">
+                            <div class="font-medium">${t.username || 'Anonymous'}</div>
+                            <div class="text-xs text-slate-500 font-mono">${t.wallet_address.slice(0, 10)}...</div>
+                        </td>
+                        <td class="py-3 px-4 text-right ${pnlColor} font-semibold">
+                            ${t.pnl >= 0 ? '+' : ''}$${t.pnl.toLocaleString(undefined, {maximumFractionDigits: 0})}
+                        </td>
+                        <td class="py-3 px-4 text-right text-slate-300">
+                            $${t.volume.toLocaleString(undefined, {maximumFractionDigits: 0})}
+                        </td>
+                        <td class="py-3 px-4 text-right">
+                            <span class="${winRate >= 55 ? 'text-emerald-400' : winRate >= 50 ? 'text-amber-400' : 'text-red-400'}">
+                                ${winRate}%
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 text-right text-slate-400">
+                            ${wins} / ${losses}
+                        </td>
+                        <td class="py-3 px-4 text-center">
+                            <div class="flex items-center justify-center gap-2">
+                                <button onclick="event.stopPropagation(); quickTrack('${t.wallet_address}')" class="p-1.5 text-blue-400 hover:bg-blue-500/20 rounded" title="Track Trader">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                    </svg>
+                                </button>
+                                <button onclick="event.stopPropagation(); quickBacktest('${t.wallet_address}')" class="p-1.5 text-emerald-400 hover:bg-emerald-500/20 rounded" title="Quick Backtest">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function showTraderDetail(wallet) {
+            currentWallet = wallet;
+            document.getElementById('modalWallet').textContent = wallet;
+            document.getElementById('modalUsername').textContent = 'Trader Analysis';
+            document.getElementById('modalContent').innerHTML = `
+                <div class="text-center py-8">
+                    <div class="inline-block w-6 h-6 border-3 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+                    <p class="text-slate-400 mt-2 text-sm">Analyzing trader...</p>
+                </div>
+            `;
+            document.getElementById('traderModal').classList.remove('hidden');
+
+            const data = await fetchAPI(`/api/traders/${wallet}/analysis`);
+
+            if (data.error) {
+                document.getElementById('modalContent').innerHTML = `
+                    <div class="text-center py-8 text-red-400">${data.error}</div>
+                `;
+                return;
+            }
+
+            document.getElementById('modalUsername').textContent = data.username || 'Anonymous Trader';
+
+            document.getElementById('modalContent').innerHTML = `
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-navy-700/50 rounded-lg p-3 text-center">
+                        <div class="text-xs text-slate-400">Total PnL</div>
+                        <div class="text-lg font-semibold ${data.pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}">
+                            ${data.pnl >= 0 ? '+' : ''}$${data.pnl.toFixed(2)}
+                        </div>
+                    </div>
+                    <div class="bg-navy-700/50 rounded-lg p-3 text-center">
+                        <div class="text-xs text-slate-400">Win Rate</div>
+                        <div class="text-lg font-semibold ${data.win_rate >= 55 ? 'text-emerald-400' : 'text-amber-400'}">
+                            ${data.win_rate}%
+                        </div>
+                    </div>
+                    <div class="bg-navy-700/50 rounded-lg p-3 text-center">
+                        <div class="text-xs text-slate-400">Total Trades</div>
+                        <div class="text-lg font-semibold">${data.total_trades || 0}</div>
+                    </div>
+                    <div class="bg-navy-700/50 rounded-lg p-3 text-center">
+                        <div class="text-xs text-slate-400">Volume</div>
+                        <div class="text-lg font-semibold">$${(data.volume || 0).toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
+                    </div>
+                </div>
+
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Wins / Losses</span>
+                        <span>${data.win_count || 0} / ${data.loss_count || 0}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Markets Traded</span>
+                        <span>${data.markets_traded || 0}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Avg Hold Time</span>
+                        <span>${data.avg_hold_hours ? data.avg_hold_hours.toFixed(1) + 'h' : 'N/A'}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Total Spent</span>
+                        <span>$${(data.total_spent || 0).toFixed(2)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400">Total Received</span>
+                        <span>$${(data.total_received || 0).toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function quickTrack(wallet) {
+            const data = await fetchAPI(`/api/traders/${wallet}/track`, { method: 'POST' });
+            if (data.error) {
+                alert(data.error);
+            } else {
+                alert(`Added ${wallet.slice(0, 10)}... to tracked wallets`);
+            }
+        }
+
+        function quickBacktest(wallet) {
+            window.location.href = `/backtest?trader_wallet=${wallet}`;
+        }
+
+        async function trackCurrentTrader() {
+            if (!currentWallet) return;
+            await quickTrack(currentWallet);
+            document.getElementById('traderModal').classList.add('hidden');
+        }
+
+        function backtestCurrentTrader() {
+            if (!currentWallet) return;
+            window.location.href = `/backtest?trader_wallet=${currentWallet}`;
+        }
+
+        // Event listeners
+        document.getElementById('refreshBtn').onclick = loadLeaderboard;
+        document.getElementById('applyFiltersBtn').onclick = loadLeaderboard;
+        document.getElementById('closeModal').onclick = () => document.getElementById('traderModal').classList.add('hidden');
+        document.getElementById('trackTraderBtn').onclick = trackCurrentTrader;
+        document.getElementById('backtestTraderBtn').onclick = backtestCurrentTrader;
+
+        // Close modal on escape
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') document.getElementById('traderModal').classList.add('hidden');
+        });
+
+        // Initialize
+        loadLeaderboard();
+    </script>
+</body>
+</html>
