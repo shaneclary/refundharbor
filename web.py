@@ -418,6 +418,13 @@ async def api_stats(user: dict = Depends(require_auth)):
     total_trades = sum(f.get("total_trades", 0) for f in all_funds)
     pnl_pct = (total_pnl / PAPER_STARTING_BALANCE * 100) if PAPER_STARTING_BALANCE > 0 else 0
 
+    # In live mode, use actual on-chain USDC balance instead of paper DB balance
+    current_mode = mode_module.get_mode()
+    if current_mode in ("global", "us"):
+        wallet = get_wallet_status()
+        if wallet.get("usdc_balance") is not None:
+            total_balance = wallet["usdc_balance"]
+
     return {
         "balance": round(total_balance, 2),
         "total_pnl": round(total_pnl, 2),
@@ -634,7 +641,34 @@ async def api_mode_set(req: ModeRequest, user: dict = Depends(require_operator))
         return {"error": f"Missing credentials for {target}: {missing}", "mode": mode_module.get_mode(), "ready": ready}
 
     new_mode = mode_module.set_mode(target)
-    return {"mode": new_mode, "ready": ready}
+
+    # Persist mode to .env file so it survives restarts
+    _persist_mode_to_env(target)
+
+    return {"mode": new_mode, "ready": ready, "persisted": True}
+
+
+def _persist_mode_to_env(mode: str) -> bool:
+    """Update POLYMARKET_MODE in .env file to persist across restarts."""
+    import re
+    env_path = os.path.join(os.path.dirname(__file__), ".env")
+    try:
+        with open(env_path, "r") as f:
+            content = f.read()
+        # Replace POLYMARKET_MODE=xxx with new value
+        new_content = re.sub(
+            r"^POLYMARKET_MODE=\w+",
+            f"POLYMARKET_MODE={mode}",
+            content,
+            flags=re.MULTILINE
+        )
+        with open(env_path, "w") as f:
+            f.write(new_content)
+        log.info("Mode persisted to .env: %s", mode)
+        return True
+    except Exception as e:
+        log.error("Failed to persist mode to .env: %s", e)
+        return False
 
 
 @app.get("/api/trader-stats")
