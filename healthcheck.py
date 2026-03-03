@@ -4,6 +4,10 @@
 import sys
 from pathlib import Path
 
+# Ensure emoji output works on Windows consoles
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 
 def check_python_version():
     """Check Python version."""
@@ -125,6 +129,55 @@ def check_database():
         return False
 
 
+def check_live_credentials():
+    """Check if live trading credentials are configured."""
+    import os
+
+    print("\n🔑 Checking live trading credentials...")
+
+    mode = os.getenv("POLYMARKET_MODE", "paper").lower()
+
+    if mode == "paper":
+        print("   ℹ️  Paper mode - live credentials not required")
+        return True
+
+    if mode == "global":
+        required = ["POLY_API_KEY", "POLY_API_SECRET", "POLY_API_PASSPHRASE", "POLY_PRIVATE_KEY"]
+        missing = [k for k in required if not os.getenv(k)]
+        if missing:
+            print(f"   ❌ Missing credentials for GLOBAL mode: {missing}")
+            return False
+        print("   ✅ GLOBAL mode credentials configured")
+        return True
+
+    if mode == "us":
+        required = ["POLY_US_API_KEY", "POLY_US_API_SECRET", "POLY_US_API_PASSPHRASE"]
+        missing = [k for k in required if not os.getenv(k)]
+        if missing:
+            print(f"   ❌ Missing credentials for US mode: {missing}")
+            return False
+        print("   ✅ US mode credentials configured")
+        return True
+
+    return True
+
+
+def check_master_key():
+    """Check if the encryption master key is set."""
+    import os
+
+    print("\n🔐 Checking credential encryption...")
+
+    if os.getenv("DENSEWEALTH_MASTER_KEY"):
+        print("   ✅ Master encryption key configured")
+        return True
+    else:
+        print("   ⚠️  DENSEWEALTH_MASTER_KEY not set")
+        print("      Encrypted credential storage disabled")
+        print("      Generate: python -c \"from credentials import generate_master_key; print(generate_master_key())\"")
+        return True  # Not fatal, just a warning
+
+
 def print_summary(checks_passed):
     """Print final summary."""
     print("\n" + "=" * 60)
@@ -158,6 +211,8 @@ def main():
         check_config(),
         check_mode(),
         check_database(),
+        check_master_key(),
+        check_live_credentials(),
     ]
 
     print_summary(checks)
