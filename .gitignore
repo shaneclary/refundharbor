@@ -53,8 +53,15 @@ logs/
 # Project specific
 densewealth.db
 densewealth.db-journal
+polytrade.db
+polytrade.db-journal
 cookies.txt
 *.txt.bak
+b64_payload.txt
+nul
+
+# Claude Code
+.claude/settings.local.json
 
 # Testing
 .pytest_cache/

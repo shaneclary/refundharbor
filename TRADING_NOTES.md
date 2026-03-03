@@ -288,18 +288,19 @@ GROUP BY trader_wallet
 
 ### Immediate (Do Now)
 - [x] Document current vs target strategy
-- [ ] Push local changes to git
-- [ ] Add futures wallet performance tracking API
+- [x] Push local changes to git (commit 6982192)
+- [x] Add futures wallet performance tracking API (commit 10f4572)
 
 ### This Week
-- [ ] Implement tiered margin sizing for futures
+- [x] Implement tiered margin sizing for futures (DONE - commit 10f4572)
+- [x] Top performer wallet boost (DONE - commit 10f4572)
 - [ ] Add stop-loss monitoring background task
 - [ ] Add futures performance chart to UI
 
 ### Next Week
 - [ ] Integrate reserve system with futures
 - [ ] Add take-profit levels
-- [ ] Top performer wallet boost
+- [ ] Add performance comparison chart (trader growth vs fund growth)
 
 ---
 
