@@ -2185,3 +2185,173 @@ def mark_futures_trade_processed(trader_wallet: str, tx_hash: str) -> None:
             """,
             (trader_wallet.lower(), tx_hash),
         )
+
+
+# ── FUTURES WALLET PERFORMANCE ───────────────────────────────────────────────
+
+
+def get_futures_wallet_performance(trader_wallet: str, account_id: int = 1) -> dict:
+    """
+    Get performance stats for a single futures wallet.
+    Returns wins, losses, total P&L, avg win/loss, win rate.
+    """
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                trader_wallet,
+                COUNT(*) as total_trades,
+                SUM(CASE WHEN realized_pnl > 0 THEN 1 ELSE 0 END) as wins,
+                SUM(CASE WHEN realized_pnl < 0 THEN 1 ELSE 0 END) as losses,
+                SUM(CASE WHEN realized_pnl = 0 THEN 1 ELSE 0 END) as breakeven,
+                COALESCE(SUM(realized_pnl), 0) as total_pnl,
+                AVG(CASE WHEN realized_pnl > 0 THEN realized_pnl END) as avg_win,
+                AVG(CASE WHEN realized_pnl < 0 THEN realized_pnl END) as avg_loss,
+                MAX(realized_pnl) as best_trade,
+                MIN(realized_pnl) as worst_trade
+            FROM futures_trades
+            WHERE trader_wallet = ? AND account_id = ?
+              AND side IN ('CLOSE_LONG', 'CLOSE_SHORT')
+            GROUP BY trader_wallet
+            """,
+            (trader_wallet.lower(), account_id),
+        ).fetchone()
+
+        if not row:
+            return {
+                "trader_wallet": trader_wallet,
+                "total_trades": 0,
+                "wins": 0,
+                "losses": 0,
+                "breakeven": 0,
+                "win_rate": 0.0,
+                "total_pnl": 0.0,
+                "avg_win": 0.0,
+                "avg_loss": 0.0,
+                "best_trade": 0.0,
+                "worst_trade": 0.0,
+                "profit_factor": 0.0,
+            }
+
+        data = dict(row)
+        wins = data["wins"] or 0
+        losses = data["losses"] or 0
+        resolved = wins + losses
+
+        data["win_rate"] = (wins / resolved * 100) if resolved > 0 else 0.0
+
+        # Profit factor = gross wins / |gross losses|
+        avg_win = data["avg_win"] or 0
+        avg_loss = abs(data["avg_loss"] or 0)
+        if avg_loss > 0 and wins > 0:
+            gross_wins = avg_win * wins
+            gross_losses = avg_loss * losses
+            data["profit_factor"] = gross_wins / gross_losses if gross_losses > 0 else 0
+        else:
+            data["profit_factor"] = 0.0
+
+        return data
+
+
+def get_all_futures_wallet_performance(account_id: int = 1) -> list[dict]:
+    """
+    Get performance stats for ALL futures wallets.
+    Returns list sorted by total P&L (best first).
+    """
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                trader_wallet,
+                COUNT(*) as total_trades,
+                SUM(CASE WHEN realized_pnl > 0 THEN 1 ELSE 0 END) as wins,
+                SUM(CASE WHEN realized_pnl < 0 THEN 1 ELSE 0 END) as losses,
+                SUM(CASE WHEN realized_pnl = 0 THEN 1 ELSE 0 END) as breakeven,
+                COALESCE(SUM(realized_pnl), 0) as total_pnl,
+                AVG(CASE WHEN realized_pnl > 0 THEN realized_pnl END) as avg_win,
+                AVG(CASE WHEN realized_pnl < 0 THEN realized_pnl END) as avg_loss,
+                MAX(realized_pnl) as best_trade,
+                MIN(realized_pnl) as worst_trade
+            FROM futures_trades
+            WHERE account_id = ?
+              AND side IN ('CLOSE_LONG', 'CLOSE_SHORT')
+            GROUP BY trader_wallet
+            ORDER BY total_pnl DESC
+            """,
+            (account_id,),
+        ).fetchall()
+
+        result = []
+        for row in rows:
+            data = dict(row)
+            wins = data["wins"] or 0
+            losses = data["losses"] or 0
+            resolved = wins + losses
+
+            data["win_rate"] = (wins / resolved * 100) if resolved > 0 else 0.0
+
+            # Profit factor
+            avg_win = data["avg_win"] or 0
+            avg_loss = abs(data["avg_loss"] or 0)
+            if avg_loss > 0 and wins > 0:
+                gross_wins = avg_win * wins
+                gross_losses = avg_loss * losses
+                data["profit_factor"] = gross_wins / gross_losses if gross_losses > 0 else 0
+            else:
+                data["profit_factor"] = 0.0
+
+            # Get wallet label if available
+            label_row = conn.execute(
+                "SELECT label FROM futures_tracked_wallets WHERE address = ?",
+                (data["trader_wallet"],),
+            ).fetchone()
+            data["label"] = label_row["label"] if label_row else ""
+
+            result.append(data)
+
+        return result
+
+
+def get_futures_performance_summary(account_id: int = 1) -> dict:
+    """
+    Get aggregate performance summary across all futures trading.
+    """
+    with get_conn() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                COUNT(*) as total_trades,
+                SUM(CASE WHEN realized_pnl > 0 THEN 1 ELSE 0 END) as wins,
+                SUM(CASE WHEN realized_pnl < 0 THEN 1 ELSE 0 END) as losses,
+                COALESCE(SUM(realized_pnl), 0) as total_pnl,
+                AVG(CASE WHEN realized_pnl > 0 THEN realized_pnl END) as avg_win,
+                AVG(CASE WHEN realized_pnl < 0 THEN realized_pnl END) as avg_loss,
+                MAX(realized_pnl) as best_trade,
+                MIN(realized_pnl) as worst_trade
+            FROM futures_trades
+            WHERE account_id = ?
+              AND side IN ('CLOSE_LONG', 'CLOSE_SHORT')
+            """,
+            (account_id,),
+        ).fetchone()
+
+        if not row or not row["total_trades"]:
+            return {
+                "total_trades": 0,
+                "wins": 0,
+                "losses": 0,
+                "win_rate": 0.0,
+                "total_pnl": 0.0,
+                "avg_win": 0.0,
+                "avg_loss": 0.0,
+                "best_trade": 0.0,
+                "worst_trade": 0.0,
+            }
+
+        data = dict(row)
+        wins = data["wins"] or 0
+        losses = data["losses"] or 0
+        resolved = wins + losses
+        data["win_rate"] = (wins / resolved * 100) if resolved > 0 else 0.0
+
+        return data

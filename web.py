@@ -1856,6 +1856,129 @@ async def api_reset_futures(
     }
 
 
+@app.get("/api/futures/wallet-performance")
+async def api_futures_wallet_performance(user: dict = Depends(require_auth)):
+    """
+    Get performance stats for all tracked futures wallets.
+    Returns wins, losses, win rate, P&L, avg win/loss for each wallet.
+    Sorted by total P&L (best performers first).
+    """
+    from db import get_all_futures_wallet_performance
+
+    stats = get_all_futures_wallet_performance(account_id=1)
+
+    # Format for UI
+    result = []
+    for i, s in enumerate(stats):
+        result.append({
+            "rank": i + 1,
+            "trader_wallet": s["trader_wallet"],
+            "label": s.get("label", ""),
+            "short": s["trader_wallet"][:8] + "...",
+            "total_trades": s["total_trades"],
+            "wins": s["wins"],
+            "losses": s["losses"],
+            "win_rate": round(s["win_rate"], 1),
+            "total_pnl": round(s["total_pnl"], 2),
+            "avg_win": round(s["avg_win"] or 0, 2),
+            "avg_loss": round(s["avg_loss"] or 0, 2),
+            "best_trade": round(s["best_trade"] or 0, 2),
+            "worst_trade": round(s["worst_trade"] or 0, 2),
+            "profit_factor": round(s["profit_factor"], 2),
+            "is_top": i == 0 and s["total_trades"] >= 5,  # Mark top performer
+        })
+
+    return result
+
+
+@app.get("/api/futures/wallet-performance/{address}")
+async def api_futures_single_wallet_performance(address: str, user: dict = Depends(require_auth)):
+    """Get performance stats for a single futures wallet."""
+    from db import get_futures_wallet_performance
+
+    stats = get_futures_wallet_performance(address, account_id=1)
+
+    return {
+        "trader_wallet": stats["trader_wallet"],
+        "total_trades": stats["total_trades"],
+        "wins": stats["wins"],
+        "losses": stats["losses"],
+        "win_rate": round(stats["win_rate"], 1),
+        "total_pnl": round(stats["total_pnl"], 2),
+        "avg_win": round(stats["avg_win"] or 0, 2),
+        "avg_loss": round(stats["avg_loss"] or 0, 2),
+        "best_trade": round(stats["best_trade"] or 0, 2),
+        "worst_trade": round(stats["worst_trade"] or 0, 2),
+        "profit_factor": round(stats["profit_factor"], 2),
+    }
+
+
+@app.get("/api/futures/performance-summary")
+async def api_futures_performance_summary(user: dict = Depends(require_auth)):
+    """
+    Get aggregate performance summary across all futures trading.
+    Includes overall win rate, P&L, and key metrics.
+    """
+    from db import get_futures_performance_summary
+
+    summary = get_futures_performance_summary(account_id=1)
+    account = get_futures_account(1)
+
+    # Calculate ROI
+    starting = 1000.0  # Default futures starting balance
+    current = account.get("balance_usdc", 0)
+    roi_pct = ((current - starting) / starting * 100) if starting > 0 else 0
+
+    return {
+        "total_trades": summary["total_trades"],
+        "wins": summary["wins"],
+        "losses": summary["losses"],
+        "win_rate": round(summary["win_rate"], 1),
+        "total_pnl": round(summary["total_pnl"], 2),
+        "avg_win": round(summary["avg_win"] or 0, 2),
+        "avg_loss": round(summary["avg_loss"] or 0, 2),
+        "best_trade": round(summary["best_trade"] or 0, 2),
+        "worst_trade": round(summary["worst_trade"] or 0, 2),
+        "current_balance": round(current, 2),
+        "starting_balance": starting,
+        "roi_pct": round(roi_pct, 2),
+    }
+
+
+@app.get("/api/futures/margin-tiers")
+async def api_futures_margin_tiers(user: dict = Depends(require_auth)):
+    """
+    Get current margin tier configuration.
+    Shows how risk limits scale with balance.
+    """
+    from futures_position_manager import FUTURES_MARGIN_TIERS, get_margin_limits_for_balance
+
+    account = get_futures_account(1)
+    balance = account.get("balance_usdc", 0)
+    current_margin_pct, current_wallet_pct = get_margin_limits_for_balance(balance)
+
+    tiers = []
+    for min_bal, margin_pct, wallet_pct in FUTURES_MARGIN_TIERS:
+        tiers.append({
+            "min_balance": min_bal,
+            "max_margin_pct": margin_pct * 100,
+            "max_wallet_pct": wallet_pct * 100,
+            "is_current": balance >= min_bal and (len(tiers) == 0 or balance < tiers[-1]["min_balance"] if tiers else True),
+        })
+
+    # Mark the actual current tier
+    for i, tier in enumerate(tiers):
+        next_threshold = tiers[i - 1]["min_balance"] if i > 0 else float("inf")
+        tier["is_current"] = tier["min_balance"] <= balance < next_threshold
+
+    return {
+        "current_balance": round(balance, 2),
+        "current_margin_pct": current_margin_pct * 100,
+        "current_wallet_pct": current_wallet_pct * 100,
+        "tiers": tiers,
+    }
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="DenseWealth Web Dashboard")
     parser.add_argument("--port", type=int, default=8050, help="Port (default: 8050)")
