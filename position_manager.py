@@ -119,7 +119,12 @@ class OrderIntent:
     account_id: Optional[int] = None  # which account this trade belongs to (new)
 
 
-def evaluate(signal: TradeSignal, fund_id: str = "main", account_id: Optional[int] = None) -> Optional[OrderIntent]:
+def evaluate(
+    signal: TradeSignal,
+    fund_id: str = "main",
+    account_id: Optional[int] = None,
+    market: Optional[dict] = None,
+) -> Optional[OrderIntent]:
     """
     Evaluate a trade signal and generate an order intent.
 
@@ -127,10 +132,14 @@ def evaluate(signal: TradeSignal, fund_id: str = "main", account_id: Optional[in
     1. Legacy fund mode: fund_id is used to look up balance from fund_accounts
     2. Account mode: account_id is used to look up balance from account_balances
 
+    Args:
+        market: Optional pre-fetched market cache dict from market_data.fetch_market_data().
+                When provided, enables liquidity gating at higher balances.
+
     Returns None if we should ignore this signal.
     """
     if signal.side == "BUY":
-        return _evaluate_buy(signal, fund_id, account_id)
+        return _evaluate_buy(signal, fund_id, account_id, market)
     elif signal.side == "SELL":
         return _evaluate_sell(signal, fund_id, account_id)
 
@@ -138,12 +147,12 @@ def evaluate(signal: TradeSignal, fund_id: str = "main", account_id: Optional[in
     return None
 
 
-def evaluate_for_account(signal: TradeSignal, account_id: int) -> Optional[OrderIntent]:
+def evaluate_for_account(signal: TradeSignal, account_id: int, market: Optional[dict] = None) -> Optional[OrderIntent]:
     """
     Evaluate a trade signal for a specific trading account.
     Uses account's trading profile for risk limits.
     """
-    return evaluate(signal, fund_id="main", account_id=account_id)
+    return evaluate(signal, fund_id="main", account_id=account_id, market=market)
 
 
 def _get_tiered_amount(balance: float) -> float:
@@ -155,7 +164,7 @@ def _get_tiered_amount(balance: float) -> float:
     return COPY_AMOUNT_USDC
 
 
-def _evaluate_buy(signal: TradeSignal, fund_id: str = "main", account_id: Optional[int] = None) -> Optional[OrderIntent]:
+def _evaluate_buy(signal: TradeSignal, fund_id: str = "main", account_id: Optional[int] = None, market: Optional[dict] = None) -> Optional[OrderIntent]:
     """
     Generate buy intent.
 
@@ -166,6 +175,7 @@ def _evaluate_buy(signal: TradeSignal, fund_id: str = "main", account_id: Option
 
     If account_id is provided, uses account's profile and tradable balance.
     Otherwise falls back to fund-based configuration.
+    If market data is provided, applies liquidity gating at higher balances.
     """
     # Get balance and config based on mode
     if account_id is not None:
@@ -259,6 +269,14 @@ def _evaluate_buy(signal: TradeSignal, fund_id: str = "main", account_id: Option
         return None
     if buy_amount > market_remaining:
         buy_amount = market_remaining
+
+    # Cap 4: market liquidity gate (only at higher balances)
+    # Rejects trades in thin markets and caps to a safe % of 24h volume.
+    from market_data import check_market_liquidity
+    ok, reason, buy_amount = check_market_liquidity(market, balance, buy_amount)
+    if not ok:
+        log.info("[%s] SKIP %s — %s", fund_id, signal.market_id[:12], reason)
+        return None
 
     # Final minimum check after all caps
     if buy_amount < MIN_COPY_USDC:

@@ -294,6 +294,9 @@
                 <button data-tab="positions" class="tab-btn flex-1 py-3 text-sm font-medium text-slate-400 relative whitespace-nowrap px-3">
                     Positions
                 </button>
+                <button data-tab="futures" class="tab-btn flex-1 py-3 text-sm font-medium text-slate-400 relative whitespace-nowrap px-3">
+                    Futures
+                </button>
                 <button data-tab="settings" class="tab-btn flex-1 py-3 text-sm font-medium text-slate-400 relative whitespace-nowrap px-3">
                     Settings
                 </button>
@@ -336,9 +339,10 @@
                     </div>
                 </div>
 
-                <!-- Performance Chart Placeholder -->
-                <div class="bg-navy-700/30 rounded-xl p-4 h-48 flex items-center justify-center">
-                    <div class="text-slate-500 text-sm">Performance chart coming soon</div>
+                <!-- Profit Allocation Funds -->
+                <div id="fundsSection" class="mb-6 hidden">
+                    <h3 class="text-sm font-medium text-slate-400 mb-3">Profit Allocations</h3>
+                    <div id="fundCards" class="space-y-2"></div>
                 </div>
             </div>
 
@@ -387,6 +391,84 @@
             <div id="tab-positions" class="tab-panel hidden">
                 <div id="positionsList" class="space-y-3">
                     <div class="text-center text-slate-500 py-8">No open positions</div>
+                </div>
+            </div>
+
+            <!-- Futures Tab (BTC-PERP Copy Trading) -->
+            <div id="tab-futures" class="tab-panel hidden">
+                <!-- Futures Stats Card (Amber/Orange theme) -->
+                <div class="bg-gradient-to-br from-amber-600/20 to-orange-600/20 border border-amber-500/30 rounded-2xl p-5 mb-4">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <div class="text-amber-400 text-sm flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                                </svg>
+                                BTC Futures
+                            </div>
+                            <div id="futuresBalance" class="text-3xl font-bold mt-1">$0.00</div>
+                        </div>
+                        <div id="futuresLiveIndicator" class="px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs font-medium">
+                            Paper
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-4 gap-3 mt-4">
+                        <div>
+                            <div class="text-slate-400 text-xs">Margin</div>
+                            <div id="futuresMargin" class="text-sm font-semibold">$0.00</div>
+                        </div>
+                        <div>
+                            <div class="text-slate-400 text-xs">Available</div>
+                            <div id="futuresAvailable" class="text-sm font-semibold">$0.00</div>
+                        </div>
+                        <div>
+                            <div class="text-slate-400 text-xs">P&L</div>
+                            <div id="futuresPnl" class="text-sm font-semibold text-emerald-400">+$0.00</div>
+                        </div>
+                        <div>
+                            <div class="text-slate-400 text-xs">Trades</div>
+                            <div id="futuresTrades" class="text-sm font-semibold">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Open Positions -->
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-medium text-slate-400">Open Positions</h3>
+                        <span id="futuresPositionCount" class="text-xs text-slate-500">0 positions</span>
+                    </div>
+                    <div id="futuresPositionsList" class="space-y-2">
+                        <div class="text-center text-slate-500 py-6 text-sm">No open futures positions</div>
+                    </div>
+                </div>
+
+                <!-- Recent Futures Trades -->
+                <div class="mb-6">
+                    <h3 class="text-sm font-medium text-slate-400 mb-3">Recent Trades</h3>
+                    <div id="futuresTradesList" class="space-y-2">
+                        <div class="text-center text-slate-500 py-6 text-sm">No futures trades yet</div>
+                    </div>
+                </div>
+
+                <!-- Tracked Wallets -->
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-medium text-slate-400">Tracked Wallets (Hyperliquid)</h3>
+                        <button id="addFuturesWalletBtn" class="touch-btn px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded-lg text-xs font-medium transition-colors">
+                            + Add
+                        </button>
+                    </div>
+                    <div id="futuresWalletsList" class="space-y-2">
+                        <div class="text-center text-slate-500 py-6 text-sm">No wallets tracked for futures</div>
+                    </div>
+                </div>
+
+                <!-- Reset Button (Admin only) -->
+                <div class="admin-only">
+                    <button id="resetFuturesBtn" class="touch-btn w-full py-3 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-xl font-medium transition-colors">
+                        Reset Futures Account
+                    </button>
                 </div>
             </div>
 
@@ -885,6 +967,57 @@
                         Save
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Futures Wallet Modal -->
+    <div id="addFuturesWalletModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] hidden flex items-center justify-center p-4">
+        <div class="bg-gradient-to-br from-navy-800 to-navy-900 rounded-2xl w-full max-w-md shadow-2xl border border-amber-500/30 overflow-hidden">
+            <!-- Header -->
+            <div class="bg-gradient-to-r from-amber-600/20 to-orange-600/20 p-4 border-b border-slate-700/50">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold text-white">Track Hyperliquid Wallet</h3>
+                        <p class="text-xs text-slate-400">Copy BTC-PERP trades from this wallet</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form -->
+            <div class="p-4 space-y-4">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Wallet Address</label>
+                    <input id="futuresWalletAddress" type="text" placeholder="0x..."
+                        class="w-full bg-navy-700 border border-slate-600 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-amber-500 transition-colors">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Label (Optional)</label>
+                    <input id="futuresWalletLabel" type="text" placeholder="e.g. Top Trader"
+                        class="w-full bg-navy-700 border border-slate-600 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500 transition-colors">
+                </div>
+
+                <!-- Info -->
+                <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                    <p class="text-xs text-amber-400">
+                        <strong>Note:</strong> Only BTC-PERP trades will be copied. The system will monitor this wallet's Hyperliquid activity.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="p-4 pt-0 flex gap-3">
+                <button id="cancelAddFuturesWallet" class="flex-1 touch-btn py-3 bg-slate-700 hover:bg-slate-600 rounded-xl font-medium transition-colors">
+                    Cancel
+                </button>
+                <button id="confirmAddFuturesWallet" class="flex-1 touch-btn py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 rounded-xl font-medium transition-colors">
+                    Add Wallet
+                </button>
             </div>
         </div>
     </div>

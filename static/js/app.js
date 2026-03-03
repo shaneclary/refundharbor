@@ -27,6 +27,11 @@
         // Activation state
         activationData: null,
         selectedActivationMode: 'auto',
+        // Futures state
+        futuresStats: {},
+        futuresPositions: [],
+        futuresTrades: [],
+        futuresWallets: [],
     };
 
     // ── API Helpers ───────────────────────────────────────────────────────────
@@ -584,6 +589,92 @@
         }
     }
 
+    async function loadFunds() {
+        const [allocData, fundsData] = await Promise.all([
+            api('/allocations'),
+            api('/funds'),
+        ]);
+
+        const section = document.getElementById('fundsSection');
+        const container = document.getElementById('fundCards');
+        if (!section || !container) return;
+
+        const funds = (allocData && allocData.funds) ? allocData.funds : [];
+        const fundDetails = Array.isArray(fundsData) ? fundsData : [];
+
+        // Only show if there's any allocation activity or main balance > 0
+        const hasActivity = funds.some(f => f.total_allocated > 0);
+        const mainFund = fundDetails.find(f => f.fund_id === 'main');
+        const mainBalance = mainFund ? mainFund.balance : 0;
+
+        if (!hasActivity && mainBalance < 1000) {
+            section.classList.add('hidden');
+            return;
+        }
+        section.classList.remove('hidden');
+
+        const colorMap = { Charity: 'emerald', Savings: 'yellow', Family: 'purple' };
+        const iconMap = { Charity: '&#9829;', Savings: '&#128179;', Family: '&#128106;' };
+
+        let html = '';
+
+        // Summary bar
+        const totalAllocated = funds.reduce((sum, f) => sum + f.total_allocated, 0);
+        const tradingPct = allocData.trading_pct || 80;
+        html += `<div class="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/50 mb-3">
+            <span class="text-xs text-slate-500">Total set aside</span>
+            <span class="text-sm font-semibold text-white">$${totalAllocated.toFixed(2)}</span>
+        </div>`;
+
+        // Fund cards
+        for (const fund of funds) {
+            const color = colorMap[fund.name] || 'blue';
+            const icon = iconMap[fund.name] || '&#128176;';
+            const detail = fundDetails.find(f => f.name === fund.name) || {};
+            const status = detail.status || 'active';
+            const walletShort = fund.wallet ? fund.wallet.slice(0, 6) + '...' + fund.wallet.slice(-4) : 'Not set';
+
+            const statusBadge = status === 'waiting'
+                ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400">Waiting</span>'
+                : '<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">Active</span>';
+
+            html += `
+            <div class="p-3 rounded-xl bg-slate-800/60 border border-slate-700/50">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-base">${icon}</span>
+                        <span class="text-sm font-medium text-white">${fund.name}</span>
+                        <span class="text-xs text-slate-500">${fund.pct}%</span>
+                    </div>
+                    ${statusBadge}
+                </div>
+                <div class="grid grid-cols-3 gap-3 text-center">
+                    <div>
+                        <div class="text-xs text-slate-500">Allocated</div>
+                        <div class="text-sm font-semibold text-${color}-400">$${fund.total_allocated.toFixed(2)}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-500">Pending</div>
+                        <div class="text-sm text-slate-300">$${fund.pending.toFixed(2)}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-500">Transferred</div>
+                        <div class="text-sm text-slate-300">$${fund.transferred.toFixed(2)}</div>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-center justify-between text-[10px] text-slate-600">
+                    <span>Wallet: ${walletShort}</span>
+                    <span>${fund.num_allocations} allocation${fund.num_allocations !== 1 ? 's' : ''}</span>
+                </div>
+            </div>`;
+        }
+
+        // Trading retention note
+        html += `<div class="text-center text-[10px] text-slate-600 mt-2">${tradingPct}% of profits stay in trading balance</div>`;
+
+        container.innerHTML = html;
+    }
+
     async function loadMyRequests() {
         const data = await api('/settings-requests?my_requests=true');
         if (data.requests) {
@@ -615,6 +706,48 @@
         }
     }
 
+    // ── Futures Data Loading ──────────────────────────────────────────────────
+    async function loadFuturesStats() {
+        const stats = await api('/futures/stats');
+        if (stats.balance !== undefined) {
+            state.futuresStats = stats;
+            renderFuturesStats();
+        }
+    }
+
+    async function loadFuturesPositions() {
+        const positions = await api('/futures/positions');
+        if (Array.isArray(positions)) {
+            state.futuresPositions = positions;
+            renderFuturesPositions();
+        }
+    }
+
+    async function loadFuturesTrades() {
+        const trades = await api('/futures/trades?limit=20');
+        if (Array.isArray(trades)) {
+            state.futuresTrades = trades;
+            renderFuturesTrades();
+        }
+    }
+
+    async function loadFuturesWallets() {
+        const wallets = await api('/futures/wallets');
+        if (Array.isArray(wallets)) {
+            state.futuresWallets = wallets;
+            renderFuturesWallets();
+        }
+    }
+
+    async function loadFuturesData() {
+        await Promise.all([
+            loadFuturesStats(),
+            loadFuturesPositions(),
+            loadFuturesTrades(),
+            loadFuturesWallets(),
+        ]);
+    }
+
     async function refreshAll() {
         if (state.isRefreshing) return;
         state.isRefreshing = true;
@@ -634,6 +767,8 @@
                 loadApprovalMode(),
                 loadReserve(),
                 loadProfile(),
+                loadFunds(),
+                loadFuturesData(),
             ]);
 
             if (state.isOperator) {
@@ -1216,6 +1351,162 @@
         });
     }
 
+    // ── Futures Rendering ─────────────────────────────────────────────────────
+    function renderFuturesStats() {
+        const stats = state.futuresStats;
+        document.getElementById('futuresBalance').textContent = `$${(stats.balance || 0).toFixed(2)}`;
+        document.getElementById('futuresMargin').textContent = `$${(stats.margin_used || 0).toFixed(2)}`;
+        document.getElementById('futuresAvailable').textContent = `$${(stats.margin_available || 0).toFixed(2)}`;
+
+        const pnl = (stats.total_pnl || 0) + (stats.unrealized_pnl || 0);
+        const pnlEl = document.getElementById('futuresPnl');
+        pnlEl.textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
+        pnlEl.className = pnl >= 0 ? 'text-sm font-semibold text-emerald-400' : 'text-sm font-semibold text-red-400';
+
+        document.getElementById('futuresTrades').textContent = stats.total_trades || 0;
+        document.getElementById('futuresPositionCount').textContent = `${stats.open_positions || 0} positions`;
+    }
+
+    function renderFuturesPositions() {
+        const container = document.getElementById('futuresPositionsList');
+        if (!container) return;
+
+        if (state.futuresPositions.length === 0) {
+            container.innerHTML = '<div class="text-center text-slate-500 py-6 text-sm">No open futures positions</div>';
+            return;
+        }
+
+        container.innerHTML = state.futuresPositions.map(p => {
+            const pnl = p.unrealized_pnl || 0;
+            const pnlPct = p.pnl_pct || 0;
+            const pnlColor = pnl >= 0 ? 'text-emerald-400' : 'text-red-400';
+            const sideColor = p.side === 'LONG' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400';
+
+            return `
+            <div class="bg-navy-700/50 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg font-bold text-amber-400">${p.symbol}</span>
+                        <span class="px-2 py-0.5 rounded text-xs font-medium ${sideColor}">${p.side}</span>
+                        <span class="text-xs text-slate-500">${p.leverage}x</span>
+                    </div>
+                    <div class="text-right">
+                        <div class="${pnlColor} font-semibold">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</div>
+                        <div class="text-xs text-slate-400">${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%</div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                        <span class="text-slate-400">Size</span>
+                        <div class="font-medium">${p.size.toFixed(4)} BTC</div>
+                    </div>
+                    <div>
+                        <span class="text-slate-400">Entry</span>
+                        <div class="font-medium">$${p.entry_price.toFixed(2)}</div>
+                    </div>
+                    <div>
+                        <span class="text-slate-400">Margin</span>
+                        <div class="font-medium">$${p.margin_used.toFixed(2)}</div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-700/50">
+                    <span class="text-xs text-slate-500">Liq: $${(p.liquidation_price || 0).toFixed(2)}</span>
+                    <span class="text-xs text-slate-500">${p.trader_short}</span>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderFuturesTrades() {
+        const container = document.getElementById('futuresTradesList');
+        if (!container) return;
+
+        if (state.futuresTrades.length === 0) {
+            container.innerHTML = '<div class="text-center text-slate-500 py-6 text-sm">No futures trades yet</div>';
+            return;
+        }
+
+        container.innerHTML = state.futuresTrades.slice(0, 10).map(t => {
+            const isClose = t.side.startsWith('CLOSE');
+            const isLong = t.side.includes('LONG');
+            const pnl = t.realized_pnl || 0;
+            const hasPnl = isClose && pnl !== 0;
+
+            const bgColor = isClose
+                ? (pnl >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10')
+                : (isLong ? 'bg-emerald-500/10' : 'bg-red-500/10');
+            const iconColor = isClose
+                ? (pnl >= 0 ? 'text-emerald-400' : 'text-red-400')
+                : (isLong ? 'text-emerald-400' : 'text-red-400');
+
+            return `
+            <div class="bg-navy-700/50 rounded-xl p-3 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center ${bgColor}">
+                        <span class="text-xs font-medium ${iconColor}">${t.side.slice(0, 1)}</span>
+                    </div>
+                    <div>
+                        <div class="text-sm font-medium flex items-center gap-2">
+                            ${t.symbol}
+                            <span class="text-xs text-slate-500">${t.leverage}x</span>
+                        </div>
+                        <div class="text-xs text-slate-400">${t.side} | ${t.trader_short}</div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm font-medium">${t.size.toFixed(4)} BTC</div>
+                    ${hasPnl
+                        ? `<div class="text-xs ${pnl >= 0 ? 'text-emerald-400' : 'text-red-400'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</div>`
+                        : `<div class="text-xs text-slate-400">@ $${t.price.toFixed(2)}</div>`
+                    }
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderFuturesWallets() {
+        const container = document.getElementById('futuresWalletsList');
+        if (!container) return;
+
+        if (state.futuresWallets.length === 0) {
+            container.innerHTML = '<div class="text-center text-slate-500 py-6 text-sm">No wallets tracked for futures</div>';
+            return;
+        }
+
+        container.innerHTML = state.futuresWallets.map(w => `
+            <div class="bg-navy-700/50 rounded-xl p-3 flex items-center justify-between" data-address="${w.address}">
+                <div class="flex items-center gap-3">
+                    <div class="w-2 h-2 rounded-full ${w.enabled ? 'bg-amber-500' : 'bg-slate-600'}"></div>
+                    <div>
+                        <div class="font-medium text-sm">${w.label || 'Unnamed'}</div>
+                        <div class="text-xs text-slate-400 font-mono">${w.short}</div>
+                    </div>
+                </div>
+                <button class="remove-futures-wallet touch-btn p-2 text-slate-400 hover:text-red-400 transition-colors" data-address="${w.address}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </button>
+            </div>
+        `).join('');
+
+        // Bind remove handlers
+        container.querySelectorAll('.remove-futures-wallet').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const address = btn.dataset.address;
+                if (confirm('Remove this wallet from futures tracking?')) {
+                    const result = await api(`/futures/wallets/${address}`, { method: 'DELETE' });
+                    if (result.success) {
+                        showToast('Wallet removed');
+                        await loadFuturesWallets();
+                    } else {
+                        showToast(result.error || 'Failed to remove', 'error');
+                    }
+                }
+            });
+        });
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
     function formatRequestType(type) {
         const labels = {
@@ -1669,6 +1960,65 @@
         });
         document.getElementById('createAccountModal')?.addEventListener('click', (e) => {
             if (e.target === e.currentTarget) e.currentTarget.classList.add('hidden');
+        });
+
+        // ── Futures Event Handlers ──
+        // Add futures wallet modal
+        document.getElementById('addFuturesWalletBtn')?.addEventListener('click', () => {
+            document.getElementById('addFuturesWalletModal').classList.remove('hidden');
+        });
+
+        document.getElementById('cancelAddFuturesWallet')?.addEventListener('click', () => {
+            document.getElementById('addFuturesWalletModal').classList.add('hidden');
+            document.getElementById('futuresWalletAddress').value = '';
+            document.getElementById('futuresWalletLabel').value = '';
+        });
+
+        document.getElementById('confirmAddFuturesWallet')?.addEventListener('click', async () => {
+            const address = document.getElementById('futuresWalletAddress').value.trim();
+            const label = document.getElementById('futuresWalletLabel').value.trim();
+
+            if (!address) {
+                showToast('Enter a wallet address', 'error');
+                return;
+            }
+
+            const result = await api('/futures/wallets', {
+                method: 'POST',
+                body: { address, label }
+            });
+
+            if (result.success) {
+                document.getElementById('addFuturesWalletModal').classList.add('hidden');
+                document.getElementById('futuresWalletAddress').value = '';
+                document.getElementById('futuresWalletLabel').value = '';
+                showToast('Wallet added to futures tracking');
+                await loadFuturesWallets();
+            } else {
+                showToast(result.error || 'Failed to add wallet', 'error');
+            }
+        });
+
+        // Close futures wallet modal on backdrop click
+        document.getElementById('addFuturesWalletModal')?.addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                e.currentTarget.classList.add('hidden');
+                document.getElementById('futuresWalletAddress').value = '';
+                document.getElementById('futuresWalletLabel').value = '';
+            }
+        });
+
+        // Reset futures account (admin only)
+        document.getElementById('resetFuturesBtn')?.addEventListener('click', async () => {
+            if (!confirm('Reset futures paper account? This will clear all positions and trades.')) return;
+
+            const result = await api('/futures/reset', { method: 'POST' });
+            if (result.success) {
+                showToast(result.message);
+                await loadFuturesData();
+            } else {
+                showToast(result.error || 'Reset failed', 'error');
+            }
         });
 
         // Pull to refresh is handled by swipe.js PullToRefresh class

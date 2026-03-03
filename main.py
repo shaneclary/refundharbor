@@ -43,11 +43,17 @@ from approval import (
 import mode as mode_module
 from paper_trader import execute_paper
 from portfolio import refresh_all_portfolios
+from market_data import fetch_market_data
 from position_manager import evaluate, OrderIntent
 from reconciler import reconcile
 from reserve import reserve_cycling_loop
 from resolver import resolution_loop
 from watcher import TradeSignal, start_watchers
+
+# Futures copy-trading imports
+from futures_watcher import FuturesTradeSignal, start_futures_watchers
+from futures_position_manager import evaluate_futures
+from futures_paper_trader import execute_futures_paper, update_unrealized_pnl
 
 
 def _get_mode() -> str:
@@ -119,10 +125,13 @@ async def process_signals(queue: asyncio.Queue[TradeSignal]) -> None:
             current_mode = mode_module.get_mode()
             approval_mode = get_approval_mode()
 
+            # Fetch market liquidity data (cached, ~0ms if fresh)
+            market = await fetch_market_data(signal.market_id)
+
             if current_mode == "paper":
                 # Fan out to all funds — each evaluates independently
                 for fund_id in FUND_CONFIGS:
-                    intent = evaluate(signal, fund_id=fund_id)
+                    intent = evaluate(signal, fund_id=fund_id, market=market)
                     if intent:
                         if approval_mode == "auto":
                             await execute_paper(intent, signal)
@@ -130,7 +139,7 @@ async def process_signals(queue: asyncio.Queue[TradeSignal]) -> None:
                             enqueue_trade(intent, signal)
             else:
                 # Live modes: only main fund trades
-                intent = evaluate(signal, fund_id="main")
+                intent = evaluate(signal, fund_id="main", market=market)
                 if intent:
                     if approval_mode == "auto":
                         execute_fn = _executors.get(current_mode)
@@ -209,6 +218,31 @@ async def process_approved_trades() -> None:
 
         except Exception as e:
             log.error("Error in approved trade processor: %s", e)
+
+
+async def process_futures_signals(queue: asyncio.Queue[FuturesTradeSignal]) -> None:
+    """Consume futures trade signals from Hyperliquid and execute paper trades."""
+    while True:
+        signal = await queue.get()
+        try:
+            intent = evaluate_futures(signal)
+            if intent:
+                await execute_futures_paper(intent, signal)
+        except Exception as e:
+            log.error("Error processing futures signal: %s", e, exc_info=True)
+        finally:
+            queue.task_done()
+
+
+async def futures_pnl_update_loop() -> None:
+    """Background loop: update unrealized P&L for all open futures positions."""
+    log.info("Futures P&L update loop started (updates every 30s)")
+    while True:
+        await asyncio.sleep(30)
+        try:
+            await update_unrealized_pnl()
+        except Exception as e:
+            log.debug("Futures P&L update error: %s", e)
 
 
 async def monthly_distribution_loop() -> None:
@@ -304,14 +338,20 @@ async def main(mode: str) -> None:
     log.info("🚀 Polybot running — watching %d wallets (mode toggle enabled)", len(get_active_wallets()))
 
     queue: asyncio.Queue[TradeSignal] = asyncio.Queue()
+    futures_queue: asyncio.Queue[FuturesTradeSignal] = asyncio.Queue()
 
     tasks = [
+        # Polymarket copy-trading
         start_watchers(queue),
         process_signals(queue),
         process_approved_trades(),  # executes operator-approved trades
         resolution_loop(),  # always run — resolves positions regardless of mode
         monthly_distribution_loop(),  # sweep allocation funds on 1st of month
         reserve_cycling_loop(),  # redistribute reserve to trading pool on schedule
+        # Futures copy-trading (BTC-PERP from Hyperliquid)
+        start_futures_watchers(futures_queue),
+        process_futures_signals(futures_queue),
+        futures_pnl_update_loop(),  # update unrealized P&L every 30s
     ]
 
     if USE_WEBSOCKET_PRICES:
@@ -319,6 +359,7 @@ async def main(mode: str) -> None:
         tasks.append(ws_price_feed())
         log.info("WebSocket price feed enabled")
 
+    log.info("🔮 Futures copy-trading enabled (BTC-PERP from Hyperliquid)")
     await asyncio.gather(*tasks)
 
 

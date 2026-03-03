@@ -248,6 +248,94 @@ def init_db() -> None:
             )
         """)
 
+        # Market liquidity cache — stores volume/liquidity data fetched from Polymarket
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS market_cache (
+                market_id TEXT PRIMARY KEY,
+                volume_24h REAL DEFAULT 0,
+                volume_total REAL DEFAULT 0,
+                liquidity REAL DEFAULT 0,
+                best_bid REAL DEFAULT 0,
+                best_ask REAL DEFAULT 0,
+                spread REAL DEFAULT 0,
+                last_trade_price REAL DEFAULT 0,
+                active INTEGER DEFAULT 1,
+                fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # ── FUTURES COPY-TRADING TABLES ────────────────────────────────────────
+
+        # Futures positions (BTC-PERP from Hyperliquid)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS futures_positions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER DEFAULT 1,
+                symbol TEXT NOT NULL,
+                trader_wallet TEXT NOT NULL,
+                side TEXT NOT NULL,
+                entry_price REAL NOT NULL,
+                size REAL NOT NULL,
+                leverage REAL NOT NULL DEFAULT 1,
+                margin_used REAL NOT NULL,
+                unrealized_pnl REAL DEFAULT 0,
+                liquidation_price REAL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(account_id, symbol, trader_wallet)
+            )
+        """)
+
+        # Futures trade history
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS futures_trades (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER DEFAULT 1,
+                symbol TEXT NOT NULL,
+                trader_wallet TEXT NOT NULL,
+                side TEXT NOT NULL,
+                size REAL NOT NULL,
+                price REAL NOT NULL,
+                leverage REAL NOT NULL,
+                realized_pnl REAL DEFAULT 0,
+                mode TEXT NOT NULL,
+                success INTEGER DEFAULT 1,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Futures paper account
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS futures_accounts (
+                account_id INTEGER PRIMARY KEY DEFAULT 1,
+                balance_usdc REAL DEFAULT 1000,
+                margin_used REAL DEFAULT 0,
+                total_pnl REAL DEFAULT 0,
+                total_trades INTEGER DEFAULT 0,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Tracked Hyperliquid wallets for futures
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS futures_tracked_wallets (
+                address TEXT PRIMARY KEY,
+                label TEXT DEFAULT '',
+                enabled INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Futures deduplication (using tx_hash from Hyperliquid)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS futures_watched_trades (
+                trader_wallet TEXT NOT NULL,
+                tx_hash TEXT NOT NULL,
+                processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(trader_wallet, tx_hash)
+            )
+        """)
+
         # ── Migrations ──────────────────────────────────────────────────────
         # Add outcome column to existing tables (safe to run multiple times)
         for table in ("positions", "trade_history"):
@@ -1773,3 +1861,327 @@ def needs_activation_prompt(account_id: int) -> bool:
         status.get("activation_status") == "pending"
         and status.get("can_activate", False)
     )
+
+
+# ── MARKET CACHE ──────────────────────────────────────────────────────────────
+
+
+def upsert_market_cache(
+    market_id: str,
+    volume_24h: float = 0,
+    volume_total: float = 0,
+    liquidity: float = 0,
+    best_bid: float = 0,
+    best_ask: float = 0,
+    spread: float = 0,
+    last_trade_price: float = 0,
+    active: bool = True,
+) -> None:
+    """Insert or update cached market data."""
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO market_cache (market_id, volume_24h, volume_total, liquidity,
+                                      best_bid, best_ask, spread, last_trade_price, active, fetched_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(market_id) DO UPDATE SET
+                volume_24h = excluded.volume_24h,
+                volume_total = excluded.volume_total,
+                liquidity = excluded.liquidity,
+                best_bid = excluded.best_bid,
+                best_ask = excluded.best_ask,
+                spread = excluded.spread,
+                last_trade_price = excluded.last_trade_price,
+                active = excluded.active,
+                fetched_at = CURRENT_TIMESTAMP
+            """,
+            (market_id, volume_24h, volume_total, liquidity, best_bid, best_ask,
+             spread, last_trade_price, int(active)),
+        )
+
+
+def get_market_cache(market_id: str) -> Optional[dict]:
+    """Get cached market data. Returns None if not cached."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM market_cache WHERE market_id = ?",
+            (market_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_market_cache_age_seconds(market_id: str) -> Optional[float]:
+    """Get how many seconds since the market cache was last updated."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT (julianday('now') - julianday(fetched_at)) * 86400 as age_seconds FROM market_cache WHERE market_id = ?",
+            (market_id,),
+        ).fetchone()
+        return row["age_seconds"] if row else None
+
+
+# ── FUTURES POSITIONS ────────────────────────────────────────────────────────
+
+
+def get_futures_position(symbol: str, trader_wallet: str, account_id: int = 1) -> Optional[dict]:
+    """Get current futures position for a symbol/wallet."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM futures_positions WHERE symbol = ? AND trader_wallet = ? AND account_id = ?",
+            (symbol, trader_wallet.lower(), account_id),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def upsert_futures_position(
+    symbol: str,
+    trader_wallet: str,
+    side: str,
+    entry_price: float,
+    size: float,
+    leverage: float,
+    margin_used: float,
+    unrealized_pnl: float = 0,
+    liquidation_price: Optional[float] = None,
+    account_id: int = 1,
+) -> None:
+    """Insert or update a futures position."""
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO futures_positions
+            (account_id, symbol, trader_wallet, side, entry_price, size, leverage, margin_used, unrealized_pnl, liquidation_price, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(account_id, symbol, trader_wallet) DO UPDATE SET
+                side = excluded.side,
+                entry_price = excluded.entry_price,
+                size = excluded.size,
+                leverage = excluded.leverage,
+                margin_used = excluded.margin_used,
+                unrealized_pnl = excluded.unrealized_pnl,
+                liquidation_price = excluded.liquidation_price,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (account_id, symbol, trader_wallet.lower(), side, entry_price, size, leverage, margin_used, unrealized_pnl, liquidation_price),
+        )
+
+
+def delete_futures_position(symbol: str, trader_wallet: str, account_id: int = 1) -> None:
+    """Delete a futures position (when fully closed)."""
+    with get_conn() as conn:
+        conn.execute(
+            "DELETE FROM futures_positions WHERE symbol = ? AND trader_wallet = ? AND account_id = ?",
+            (symbol, trader_wallet.lower(), account_id),
+        )
+
+
+def get_all_futures_positions(account_id: int = 1) -> list[dict]:
+    """Get all active futures positions."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM futures_positions WHERE account_id = ? ORDER BY updated_at DESC",
+            (account_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_futures_wallet_margin(trader_wallet: str, account_id: int = 1) -> float:
+    """Get total margin used across all positions for a specific tracked wallet."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COALESCE(SUM(margin_used), 0) as total FROM futures_positions WHERE trader_wallet = ? AND account_id = ?",
+            (trader_wallet.lower(), account_id),
+        ).fetchone()
+        return row["total"]
+
+
+# ── FUTURES TRADE HISTORY ────────────────────────────────────────────────────
+
+
+def log_futures_trade(
+    symbol: str,
+    trader_wallet: str,
+    side: str,
+    size: float,
+    price: float,
+    leverage: float,
+    realized_pnl: float = 0,
+    mode: str = "paper",
+    success: bool = True,
+    account_id: int = 1,
+) -> None:
+    """Log a futures trade to history."""
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO futures_trades
+            (account_id, symbol, trader_wallet, side, size, price, leverage, realized_pnl, mode, success)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (account_id, symbol, trader_wallet.lower(), side, size, price, leverage, realized_pnl, mode, 1 if success else 0),
+        )
+
+
+def get_futures_trade_history(account_id: int = 1, limit: int = 50) -> list[dict]:
+    """Get recent futures trade history."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM futures_trades WHERE account_id = ? ORDER BY timestamp DESC LIMIT ?",
+            (account_id, limit),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+# ── FUTURES ACCOUNTS ─────────────────────────────────────────────────────────
+
+
+def init_futures_account(starting_balance: float, account_id: int = 1) -> None:
+    """Initialize futures paper trading account."""
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO futures_accounts (account_id, balance_usdc, margin_used, total_pnl, total_trades)
+            VALUES (?, ?, 0, 0, 0)
+            """,
+            (account_id, starting_balance),
+        )
+
+
+def get_futures_account(account_id: int = 1) -> dict:
+    """Get futures account stats."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM futures_accounts WHERE account_id = ?",
+            (account_id,),
+        ).fetchone()
+        if row:
+            return dict(row)
+        return {
+            "account_id": account_id,
+            "balance_usdc": 0,
+            "margin_used": 0,
+            "total_pnl": 0,
+            "total_trades": 0,
+        }
+
+
+def update_futures_account(
+    account_id: int = 1,
+    balance_usdc: Optional[float] = None,
+    margin_used: Optional[float] = None,
+    pnl_delta: float = 0,
+    trade_count_delta: int = 0,
+) -> None:
+    """Update futures account."""
+    updates = ["updated_at = CURRENT_TIMESTAMP"]
+    params = []
+
+    if balance_usdc is not None:
+        updates.append("balance_usdc = ?")
+        params.append(balance_usdc)
+    if margin_used is not None:
+        updates.append("margin_used = ?")
+        params.append(margin_used)
+    if pnl_delta != 0:
+        updates.append("total_pnl = total_pnl + ?")
+        params.append(pnl_delta)
+    if trade_count_delta != 0:
+        updates.append("total_trades = total_trades + ?")
+        params.append(trade_count_delta)
+
+    params.append(account_id)
+
+    with get_conn() as conn:
+        conn.execute(
+            f"UPDATE futures_accounts SET {', '.join(updates)} WHERE account_id = ?",
+            params,
+        )
+
+
+def reset_futures_account(starting_balance: float = 1000, account_id: int = 1) -> None:
+    """Reset futures paper account, clearing all positions and trades."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM futures_positions WHERE account_id = ?", (account_id,))
+        conn.execute("DELETE FROM futures_trades WHERE account_id = ?", (account_id,))
+        conn.execute("DELETE FROM futures_accounts WHERE account_id = ?", (account_id,))
+        conn.execute("DELETE FROM futures_watched_trades")
+    init_futures_account(starting_balance, account_id)
+
+
+# ── FUTURES TRACKED WALLETS ──────────────────────────────────────────────────
+
+
+def get_futures_tracked_wallets() -> list[dict]:
+    """Get all enabled futures tracked wallets."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM futures_tracked_wallets WHERE enabled = 1 ORDER BY created_at ASC"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_all_futures_tracked_wallets() -> list[dict]:
+    """Get all futures tracked wallets including disabled."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM futures_tracked_wallets ORDER BY created_at ASC"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def add_futures_tracked_wallet(address: str, label: str = "") -> bool:
+    """Add a new wallet to track for futures. Returns True if added."""
+    with get_conn() as conn:
+        try:
+            conn.execute(
+                "INSERT INTO futures_tracked_wallets (address, label) VALUES (?, ?)",
+                (address.lower(), label),
+            )
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+
+def remove_futures_tracked_wallet(address: str) -> bool:
+    """Remove a futures tracked wallet. Returns True if found and removed."""
+    with get_conn() as conn:
+        cursor = conn.execute(
+            "DELETE FROM futures_tracked_wallets WHERE address = ?",
+            (address.lower(),),
+        )
+        return cursor.rowcount > 0
+
+
+def toggle_futures_wallet(address: str, enabled: bool) -> bool:
+    """Enable or disable a futures tracked wallet."""
+    with get_conn() as conn:
+        cursor = conn.execute(
+            "UPDATE futures_tracked_wallets SET enabled = ? WHERE address = ?",
+            (1 if enabled else 0, address.lower()),
+        )
+        return cursor.rowcount > 0
+
+
+# ── FUTURES DEDUPLICATION ────────────────────────────────────────────────────
+
+
+def is_futures_trade_processed(trader_wallet: str, tx_hash: str) -> bool:
+    """Check if we've already processed this futures trade."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM futures_watched_trades WHERE trader_wallet = ? AND tx_hash = ?",
+            (trader_wallet.lower(), tx_hash),
+        ).fetchone()
+        return row is not None
+
+
+def mark_futures_trade_processed(trader_wallet: str, tx_hash: str) -> None:
+    """Mark a futures trade as processed."""
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO futures_watched_trades (trader_wallet, tx_hash)
+            VALUES (?, ?)
+            """,
+            (trader_wallet.lower(), tx_hash),
+        )

@@ -54,6 +54,16 @@ from db import (
     remove_tracked_wallet,
     seed_wallets,
     update_wallet_label,
+    # Futures imports
+    add_futures_tracked_wallet,
+    get_all_futures_positions,
+    get_all_futures_tracked_wallets,
+    get_futures_account,
+    get_futures_trade_history,
+    get_futures_tracked_wallets,
+    remove_futures_tracked_wallet,
+    reset_futures_account,
+    toggle_futures_wallet,
 )
 from auth import (
     authenticate,
@@ -180,6 +190,15 @@ class AddWalletRequest(BaseModel):
 
 class UpdateWalletRequest(BaseModel):
     label: str = Field(..., max_length=100)
+
+
+class AddFuturesWalletRequest(BaseModel):
+    address: str = Field(..., min_length=1, max_length=100)
+    label: str = Field("", max_length=100)
+
+
+class ResetFuturesBalanceRequest(BaseModel):
+    balance: float = Field(1000.0, gt=0, le=10_000_000)
 
 
 class ResetBalanceRequest(BaseModel):
@@ -1698,6 +1717,143 @@ async def api_deactivate_account(
         )
 
     return result
+
+
+# ── FUTURES COPY-TRADING ROUTES ──────────────────────────────────────────────
+
+
+@app.get("/api/futures/stats")
+async def api_futures_stats():
+    """Get futures account stats (balance, margin, P&L)."""
+    account = get_futures_account(1)
+    positions = get_all_futures_positions(1)
+
+    # Calculate total unrealized P&L
+    unrealized_pnl = sum(p.get("unrealized_pnl", 0) for p in positions)
+
+    return {
+        "balance": account.get("balance_usdc", 0),
+        "margin_used": account.get("margin_used", 0),
+        "margin_available": account.get("balance_usdc", 0) - account.get("margin_used", 0),
+        "total_pnl": account.get("total_pnl", 0),
+        "unrealized_pnl": unrealized_pnl,
+        "total_trades": account.get("total_trades", 0),
+        "open_positions": len(positions),
+    }
+
+
+@app.get("/api/futures/positions")
+async def api_futures_positions():
+    """Get all open futures positions."""
+    positions = get_all_futures_positions(1)
+
+    # Format for UI
+    result = []
+    for p in positions:
+        result.append({
+            "id": p.get("id"),
+            "symbol": p.get("symbol"),
+            "trader_wallet": p.get("trader_wallet"),
+            "trader_short": p.get("trader_wallet", "")[:8] + "...",
+            "side": p.get("side"),
+            "entry_price": p.get("entry_price"),
+            "size": p.get("size"),
+            "size_usd": p.get("size", 0) * p.get("entry_price", 0),
+            "leverage": p.get("leverage"),
+            "margin_used": p.get("margin_used"),
+            "unrealized_pnl": p.get("unrealized_pnl", 0),
+            "pnl_pct": (p.get("unrealized_pnl", 0) / p.get("margin_used", 1) * 100) if p.get("margin_used", 0) > 0 else 0,
+            "liquidation_price": p.get("liquidation_price"),
+            "created_at": p.get("created_at"),
+            "updated_at": p.get("updated_at"),
+        })
+
+    return result
+
+
+@app.get("/api/futures/trades")
+async def api_futures_trades(limit: int = 50):
+    """Get futures trade history."""
+    trades = get_futures_trade_history(1, limit)
+
+    # Format timestamps and add short wallet
+    for t in trades:
+        t["trader_short"] = t.get("trader_wallet", "")[:8] + "..."
+        # Format timestamp if available
+        if t.get("timestamp"):
+            from datetime import datetime
+            try:
+                ts = t["timestamp"]
+                if isinstance(ts, str):
+                    dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                    t["time"] = dt.strftime("%H:%M:%S")
+                else:
+                    t["time"] = str(ts)
+            except:
+                t["time"] = str(t["timestamp"])
+
+    return trades
+
+
+@app.get("/api/futures/wallets")
+async def api_futures_wallets():
+    """Get all tracked Hyperliquid wallets for futures."""
+    wallets = get_all_futures_tracked_wallets()
+
+    for w in wallets:
+        w["short"] = w.get("address", "")[:8] + "..." + w.get("address", "")[-6:]
+
+    return wallets
+
+
+@app.post("/api/futures/wallets")
+async def api_add_futures_wallet(req: AddFuturesWalletRequest, user: dict = Depends(require_auth)):
+    """Add a Hyperliquid wallet to track for futures."""
+    address = req.address.strip()
+
+    # Validate address format (basic check)
+    if not address.startswith("0x") or len(address) != 42:
+        return {"error": "Invalid address format. Must be 0x followed by 40 hex characters."}
+
+    success = add_futures_tracked_wallet(address, req.label)
+    if success:
+        return {"success": True, "address": address.lower(), "label": req.label}
+    else:
+        return {"error": "Wallet already tracked or invalid address."}
+
+
+@app.delete("/api/futures/wallets/{address}")
+async def api_remove_futures_wallet(address: str, user: dict = Depends(require_auth)):
+    """Remove a Hyperliquid wallet from futures tracking."""
+    success = remove_futures_tracked_wallet(address)
+    if success:
+        return {"success": True, "address": address}
+    else:
+        return {"error": "Wallet not found"}
+
+
+@app.patch("/api/futures/wallets/{address}")
+async def api_toggle_futures_wallet(address: str, enabled: bool = True, user: dict = Depends(require_auth)):
+    """Enable or disable a futures tracked wallet."""
+    success = toggle_futures_wallet(address, enabled)
+    if success:
+        return {"success": True, "address": address, "enabled": enabled}
+    else:
+        return {"error": "Wallet not found"}
+
+
+@app.post("/api/futures/reset")
+async def api_reset_futures(
+    req: ResetFuturesBalanceRequest = ResetFuturesBalanceRequest(),
+    user: dict = Depends(require_operator),
+):
+    """Reset futures paper trading account. Operator only."""
+    reset_futures_account(req.balance)
+    return {
+        "success": True,
+        "message": f"Futures account reset to ${req.balance:.2f}",
+        "balance": req.balance,
+    }
 
 
 if __name__ == "__main__":
