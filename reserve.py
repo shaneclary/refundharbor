@@ -321,6 +321,54 @@ def get_all_reserve_statuses() -> list[dict]:
     ]
 
 
+# ── SETTLEMENT SCHEDULER ─────────────────────────────────────────────────────
+
+
+async def settlement_loop() -> None:
+    """
+    Background loop that processes pending settlements.
+
+    NEW POLICY: Allocated funds are marked as 'pending' and remain tradable.
+    This loop settles them (locks from trading) 3 hours before distribution,
+    then distributes them to the allocation funds.
+
+    Runs every minute to catch settlement windows.
+    """
+    from db import (
+        settle_pending_allocations,
+        distribute_settled_allocations,
+        get_settlement_dashboard,
+    )
+
+    log.info("Settlement scheduler started (3hr pre-distribution lock policy)")
+
+    while True:
+        try:
+            # Check for pending allocations that need to be settled (locked)
+            settled = settle_pending_allocations()
+            if settled:
+                log.info(
+                    "Settled %d allocation(s): $%.2f now locked",
+                    len(settled),
+                    sum(s["amount"] for s in settled)
+                )
+
+            # Check for settled allocations ready for distribution
+            distributed = distribute_settled_allocations()
+            if distributed:
+                log.info(
+                    "Distributed %d allocation(s): $%.2f sent to funds",
+                    len(distributed),
+                    sum(s["amount"] for s in distributed)
+                )
+
+        except Exception as e:
+            log.error("Error in settlement loop: %s", e)
+
+        # Check every minute for precise settlement timing
+        await asyncio.sleep(60)
+
+
 # ── FULL MOON HARVEST SCHEDULER ──────────────────────────────────────────────
 
 

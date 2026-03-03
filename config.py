@@ -239,6 +239,11 @@ if not DENSEWEALTH_MASTER_KEY:
         "Generate one with: python -c \"from credentials import generate_master_key; print(generate_master_key())\""
     )
 
+# ── SETTLEMENT POLICY ─────────────────────────────────────────────────────────
+# Hours before distribution when funds are settled (locked from trading)
+# Until settlement, allocated funds remain available for trading
+SETTLEMENT_HOURS_BEFORE = float(os.getenv("SETTLEMENT_HOURS_BEFORE", "3"))
+
 # ── RESERVE SYSTEM ────────────────────────────────────────────────────────────
 # Default reserve percentage (0-100%) - portion of balance excluded from trading
 DEFAULT_RESERVE_PCT = float(os.getenv("DEFAULT_RESERVE_PCT", "0"))

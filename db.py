@@ -421,6 +421,23 @@ def init_db() -> None:
             )
         """)
 
+        # Pending settlements (funds allocated but not yet locked)
+        # Status: pending (tradable) → settled (locked) → distributed (sent)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS pending_settlements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fund_id TEXT NOT NULL,
+                amount REAL NOT NULL,
+                full_moon_date TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                settle_at TIMESTAMP NOT NULL,
+                distribute_at TIMESTAMP,
+                settled_at TIMESTAMP,
+                distributed_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         # ── Migrations ──────────────────────────────────────────────────────
         # Add outcome column to existing tables (safe to run multiple times)
         for table in ("positions", "trade_history"):
@@ -950,8 +967,10 @@ def get_harvest_dashboard() -> dict:
     Get harvest status for dashboard display.
 
     Shows pending amounts building up and countdown to full moon.
+    Includes settlement status (pending = tradable, settled = locked).
     """
     from full_moon import get_harvest_status, format_moon_phase_display
+    from config import SETTLEMENT_HOURS_BEFORE
 
     moon_status = get_harvest_status()
     pending = get_all_pending_harvests()
@@ -959,6 +978,9 @@ def get_harvest_dashboard() -> dict:
     # Calculate totals
     pending_by_fund = {p["fund_id"]: p["pending_amount"] for p in pending}
     total_pending = sum(p["pending_amount"] for p in pending)
+
+    # Get settlement status (allocated funds in pending/settled state)
+    settlement_info = get_settlement_dashboard()
 
     return {
         "moon_phase": format_moon_phase_display(moon_status["days_until_full_moon"]),
@@ -975,6 +997,14 @@ def get_harvest_dashboard() -> dict:
             "total": total_pending,
         },
         "recent_harvests": get_harvest_history(5),
+        # Settlement policy info
+        "settlement": {
+            "policy": f"Funds settle {SETTLEMENT_HOURS_BEFORE}h before distribution",
+            "pending_tradable": settlement_info["pending_total"],  # Still available for trading
+            "settled_locked": settlement_info["settled_total"],  # Locked, awaiting distribution
+            "next_settlement": settlement_info["next_settlement"],
+            "next_distribution": settlement_info["next_distribution"],
+        },
     }
 
 
@@ -1068,14 +1098,18 @@ def get_all_pending_harvests() -> list[dict]:
 def harvest_pending_funds(fund_id: str, full_moon_date: str) -> float:
     """
     Harvest pending funds for a fund on the full moon.
-    Moves funds from main balance to the allocation fund.
-    Returns the amount harvested.
+
+    NEW POLICY: Funds are marked as 'pending' and remain available for trading.
+    They are settled (locked) 3 hours before distribution.
+
+    Returns the amount harvested (scheduled for settlement).
     """
     pending = get_pending_harvest_total(fund_id)
     if pending < 0.01:
         return 0.0
 
-    from datetime import datetime
+    from datetime import datetime, timedelta
+    from config import SETTLEMENT_HOURS_BEFORE
 
     # Get main balance and ensure we have enough
     main_balance = get_fund_balance("main")
@@ -1084,37 +1118,240 @@ def harvest_pending_funds(fund_id: str, full_moon_date: str) -> float:
     if harvest_amount < 0.01:
         return 0.0
 
-    # Debit main, credit the allocation fund
-    update_fund_balance("main", main_balance - harvest_amount)
-    fund_balance = get_fund_balance(fund_id)
-    update_fund_balance(fund_id, fund_balance + harvest_amount)
+    now = datetime.now()
 
-    # Record the harvest
+    # Schedule settlement 3 hours before distribution
+    # Distribution happens at next scheduled time (e.g., 24 hours from now)
+    distribute_at = now + timedelta(hours=24)
+    settle_at = distribute_at - timedelta(hours=SETTLEMENT_HOURS_BEFORE)
+
+    # Create pending settlement (funds stay in pool until settle_at)
     with get_conn() as conn:
         conn.execute(
             """
-            INSERT INTO harvest_history (harvest_date, fund_id, amount, full_moon_date)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO pending_settlements
+                (fund_id, amount, full_moon_date, status, settle_at, distribute_at)
+            VALUES (?, ?, ?, 'pending', ?, ?)
             """,
-            (datetime.now().strftime("%Y-%m-%d"), fund_id, harvest_amount, full_moon_date),
+            (fund_id, harvest_amount, full_moon_date,
+             settle_at.isoformat(), distribute_at.isoformat()),
         )
-        # Clear the pending entries for this fund
+        # Clear the pending harvest entries for this fund
         conn.execute("DELETE FROM pending_harvest WHERE fund_id = ?", (fund_id,))
 
-    # Also record as allocation for tracking
-    record_allocation(
-        fund_name=fund_id.capitalize(),
-        amount=harvest_amount,
-        source_market="full_moon_harvest",
-        source_pnl=harvest_amount,
-    )
+    # Record the harvest event (but funds not moved yet)
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO harvest_history (harvest_date, fund_id, amount, full_moon_date, status)
+            VALUES (?, ?, ?, ?, 'pending')
+            """,
+            (now.strftime("%Y-%m-%d"), fund_id, harvest_amount, full_moon_date),
+        )
 
     log.info(
-        "Full Moon Harvest: %s received $%.2f (full moon: %s)",
-        fund_id, harvest_amount, full_moon_date
+        "Full Moon Harvest: %s scheduled $%.2f (pending until %s, settles at %s)",
+        fund_id, harvest_amount, distribute_at.strftime("%H:%M"), settle_at.strftime("%H:%M")
     )
 
     return harvest_amount
+
+
+def get_pending_settlements(status: str = "pending") -> list[dict]:
+    """Get pending settlements by status."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM pending_settlements WHERE status = ? ORDER BY settle_at",
+            (status,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_total_pending_settlement_amount() -> float:
+    """Get total amount in pending settlements (still tradable)."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COALESCE(SUM(amount), 0) as total FROM pending_settlements WHERE status = 'pending'"
+        ).fetchone()
+        return row["total"] if row else 0.0
+
+
+def get_total_settled_amount() -> float:
+    """Get total amount in settled state (locked, not tradable)."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COALESCE(SUM(amount), 0) as total FROM pending_settlements WHERE status = 'settled'"
+        ).fetchone()
+        return row["total"] if row else 0.0
+
+
+def settle_pending_allocations() -> list[dict]:
+    """
+    Settle any pending allocations that have reached their settle_at time.
+
+    Moves funds from main balance to locked state (no longer tradable).
+    Returns list of settlements that were processed.
+    """
+    from datetime import datetime
+
+    now = datetime.now()
+    settled = []
+
+    with get_conn() as conn:
+        # Find pending settlements that need to be settled
+        rows = conn.execute(
+            """
+            SELECT * FROM pending_settlements
+            WHERE status = 'pending' AND settle_at <= ?
+            """,
+            (now.isoformat(),),
+        ).fetchall()
+
+        for row in rows:
+            settlement = dict(row)
+            fund_id = settlement["fund_id"]
+            amount = settlement["amount"]
+
+            # Lock the funds: debit from main balance
+            main_balance = get_fund_balance("main")
+            if main_balance >= amount:
+                update_fund_balance("main", main_balance - amount)
+
+                # Update settlement status to settled
+                conn.execute(
+                    """
+                    UPDATE pending_settlements
+                    SET status = 'settled', settled_at = ?
+                    WHERE id = ?
+                    """,
+                    (now.isoformat(), settlement["id"]),
+                )
+
+                log.info(
+                    "Settlement locked: %s $%.2f (main balance now $%.2f)",
+                    fund_id, amount, main_balance - amount
+                )
+                settled.append(settlement)
+            else:
+                # Not enough balance - partial settlement
+                if main_balance > 0.01:
+                    update_fund_balance("main", 0)
+                    conn.execute(
+                        """
+                        UPDATE pending_settlements
+                        SET amount = ?, status = 'settled', settled_at = ?
+                        WHERE id = ?
+                        """,
+                        (main_balance, now.isoformat(), settlement["id"]),
+                    )
+                    log.warning(
+                        "Partial settlement: %s $%.2f of $%.2f (insufficient balance)",
+                        fund_id, main_balance, amount
+                    )
+                    settlement["amount"] = main_balance
+                    settled.append(settlement)
+
+    return settled
+
+
+def distribute_settled_allocations() -> list[dict]:
+    """
+    Distribute settled allocations to their destination funds.
+
+    Called when distribute_at time is reached.
+    Returns list of distributions processed.
+    """
+    from datetime import datetime
+
+    now = datetime.now()
+    distributed = []
+
+    with get_conn() as conn:
+        # Find settled allocations ready for distribution
+        rows = conn.execute(
+            """
+            SELECT * FROM pending_settlements
+            WHERE status = 'settled' AND distribute_at <= ?
+            """,
+            (now.isoformat(),),
+        ).fetchall()
+
+        for row in rows:
+            settlement = dict(row)
+            fund_id = settlement["fund_id"]
+            amount = settlement["amount"]
+
+            # Credit the allocation fund
+            fund_balance = get_fund_balance(fund_id)
+            update_fund_balance(fund_id, fund_balance + amount)
+
+            # Update settlement status to distributed
+            conn.execute(
+                """
+                UPDATE pending_settlements
+                SET status = 'distributed', distributed_at = ?
+                WHERE id = ?
+                """,
+                (now.isoformat(), settlement["id"]),
+            )
+
+            # Update harvest history status
+            conn.execute(
+                """
+                UPDATE harvest_history
+                SET status = 'completed'
+                WHERE fund_id = ? AND full_moon_date = ? AND status = 'pending'
+                """,
+                (fund_id, settlement["full_moon_date"]),
+            )
+
+            # Record as allocation for tracking
+            record_allocation(
+                fund_name=fund_id.capitalize(),
+                amount=amount,
+                source_market="full_moon_harvest",
+                source_pnl=amount,
+            )
+
+            log.info(
+                "Distribution complete: %s received $%.2f",
+                fund_id, amount
+            )
+            distributed.append(settlement)
+
+    return distributed
+
+
+def get_settlement_dashboard() -> dict:
+    """Get settlement status for dashboard display."""
+    pending = get_pending_settlements("pending")
+    settled = get_pending_settlements("settled")
+
+    pending_total = sum(s["amount"] for s in pending)
+    settled_total = sum(s["amount"] for s in settled)
+
+    # Next settlement time
+    next_settle = None
+    if pending:
+        next_settle = pending[0]["settle_at"]
+
+    # Next distribution time
+    next_distribute = None
+    if settled:
+        next_distribute = settled[0]["distribute_at"]
+
+    return {
+        "pending_count": len(pending),
+        "pending_total": round(pending_total, 2),
+        "pending_tradable": True,  # Pending funds are available for trading
+        "settled_count": len(settled),
+        "settled_total": round(settled_total, 2),
+        "settled_locked": True,  # Settled funds are locked
+        "next_settlement": next_settle,
+        "next_distribution": next_distribute,
+        "pending_settlements": pending,
+        "settled_settlements": settled,
+    }
 
 
 def get_harvest_history(limit: int = 20) -> list[dict]:
