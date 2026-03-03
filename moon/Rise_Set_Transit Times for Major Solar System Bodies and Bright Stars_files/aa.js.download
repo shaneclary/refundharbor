@@ -1,0 +1,289 @@
+// Fetch US Places Info and Fill in the Boxes
+function getUSPlacesInfo(){
+  var modal = document.getElementById("usa-location-modal");
+  var city = document.getElementById('city').value;
+  var elState = document.getElementById("state");
+  var state_abbr = elState.options[elState.selectedIndex].value;
+  const Http = new XMLHttpRequest();
+  const url='/api/usplace?loc=' + city + ',' + state_abbr;
+  Http.open("GET", url);
+  Http.send();
+
+  Http.onreadystatechange = function(e) {
+    if (this.readyState == 4 && this.status === 200) {
+      data = JSON.parse(Http.responseText);
+      var lat = document.getElementById('lat');
+      var lon = document.getElementById('lon');
+
+      // If daylight saving time applies for this
+      // data service, check the appropriate radio button
+      if (document.getElementById('dst-radio-1'))
+      {
+        if (data.dstexempt === false) {
+          var dst_radio_1 = document.getElementById('dst-radio-1');
+          dst_radio_1.checked = true;
+        } 
+        else
+        {
+          var dst_radio_0 = document.getElementById('dst-radio-0');
+          dst_radio_0.checked = true;
+        }
+      }
+
+      if (document.getElementById('tz'))
+      {
+        var tz = document.getElementById('tz');
+        var tz_sign_0 = document.getElementById('tz_sign-0');
+        var tz_sign_1 = document.getElementById('tz_sign-1');
+
+        tz.value = Math.abs(data.tz);
+
+        if (parseInt(data.tz) < 0)
+        {
+            tz_sign_1.checked = true
+        }
+        else
+        {
+            tz_sign_0.checked = true
+        }
+      }
+    
+      //var height = document.getElementById('height');
+
+      lat.value = data.latitude;
+      lon.value = data.longitude;
+      
+      if (document.getElementById('label'))
+      {
+        document.getElementById('label').value = data.city + ", " + data.state;
+      }
+
+  // Check the box to use US TZ labels in printout
+      if (document.getElementById('tz-label-1'))
+      {
+        var tz_label = document.getElementById('tz-label-1');
+        tz_label.checked = true;
+      }
+        
+      //document.getElementById('location-message').display = "hidden";
+      //height.value = data.height 
+      modal.style.display = "none";       
+    }else{
+      data = JSON.parse(Http.responseText);
+      //console.log(this. status+" "+this.readyState);
+      var errmsg = document.getElementById('location-message');
+      errmsg.style.display = "";
+      errmsg.style.height = "80px";
+      errmsg.classList.add('usa-alert--error');
+      var errtxt = document.getElementsByClassName('usa-alert__text')[0];
+      errtxt.innerHTML = "Error: " + data.error;
+    }
+  }
+}
+function getUSPlacesCoords(){
+  const input_val = document.getElementById('label');
+  const loc = input_val.value;
+  const Http = new XMLHttpRequest();
+  const url='/api/usplace?loc=' + loc;
+  try{
+    Http.open("GET", url);
+    Http.send();
+    Http.onreadystatechange = function(e) {
+      if (this.readyState == 4 && this.status === 200) {
+        data = JSON.parse(Http.responseText);
+        if(data){
+          
+        }
+        document.getElementById('lat').value = data.latitude;
+        document.getElementById('lon').value = data.longitude;
+      }
+    }
+  }catch(error){
+
+  }
+}
+
+
+// ******** USA LOCATION MODAL **********
+if (document.getElementById('usa-location-modal'))
+{
+
+  // Get the modal
+  var modal = document.getElementById("usa-location-modal");
+
+  // Get the button that opens the modal
+  var btn = document.getElementById("get-usa-loc-info");
+
+  // Get the button that imports the data
+  var importBtn = document.getElementById("import-usa-loc-data");
+
+  // Get the <span> element that closes the modal
+  var span = document.getElementsByClassName("close")[0];
+
+  // When the user clicks on the button, open the modal
+  btn.onclick = function() {
+    modal.style.display = "block";
+    //reset error msg
+    var errtxt = document.getElementsByClassName('usa-alert__text')[0];
+    errtxt.innerHTML = "";
+    var errmsg = document.getElementById('location-message');
+    errmsg.classList.remove('usa-alert--error');
+    errmsg.style.display = "none"; 
+    errmsg.style.height = "0px";
+    document.getElementById('location-message').display = "hidden";
+  }
+
+  // When the user clicks on <span> (x), close the modal
+  span.onclick = function() {
+    modal.style.display = "none";
+  }
+
+  // When the user clicks anywhere outside of the modal, close it
+  window.onclick = function(event) {
+    if (event.target == modal) {
+      modal.style.display = "none";
+    }
+  }
+
+  // Import data into the form
+  importBtn.onclick = function() {
+    getUSPlacesInfo();
+  }
+}
+  
+
+// ************** DMS -> Decimal Degrees Modal *************
+if (document.getElementById('dms-location-modal'))
+{
+  // Get the modal
+  var dmsmodal = document.getElementById("dms-location-modal");
+
+  // Get the button that opens the modal
+  var dmsbtn = document.getElementById("get-dms-loc-info");
+
+  // Get the button that imports the data
+  var dmsimportBtn = document.getElementById("import-dms-loc-data");
+
+  // Get the <span> element that closes the modal
+  var dmsspan = document.getElementsByClassName("close")[1];
+
+  // When the user clicks on the button, open the modal
+  dmsbtn.onclick = function() {
+    dmsmodal.style.display = "block";
+  }
+
+  // When the user clicks on <span> (x), close the modal
+  dmsspan.onclick = function() {
+    dmsmodal.style.display = "none";
+  }
+
+  // When the user clicks anywhere outside of the modal, close it
+  window.onclick = function(event) {
+    if (event.target == dmsmodal) {
+      dmsmodal.style.display = "none";
+    }
+  }
+
+// Import data into the form
+  dmsimportBtn.onclick = function() {
+    var latdeg = (document.getElementById('latdeg').value 
+                  ? document.getElementById('latdeg').value : 0);
+    var latmin = (document.getElementById('latmin').value 
+                  ? document.getElementById('latmin').value : 0);
+    var latsec = (document.getElementById('latsec').value
+                  ? document.getElementById('latsec').value : 0);
+    var londeg = (document.getElementById('londeg').value
+                  ? document.getElementById('londeg').value : 0);
+    var lonmin = (document.getElementById('lonmin').value
+                  ? document.getElementById('lonmin').value : 0);
+    var lonsec = (document.getElementById('lonsec').value
+                  ? document.getElementById('lonsec').value : 0);
+
+    var lad = parseInt(latdeg);
+    var lod = parseInt(londeg);
+
+    var latitude = Math.abs(lad) + (parseInt(latmin) / 60.0) + (parseInt(latsec) / 3600.0);
+
+    var longitude = Math.abs(lod) + (parseInt(lonmin) / 60.0) + (parseInt(lonsec) / 3600.0);
+
+    if (lad < 0){
+      latitude *= -1;
+    }
+
+    if (lod < 0){
+      longitude *= -1;
+    }
+
+    var lat = document.getElementById('lat');
+    var lon = document.getElementById('lon');
+    
+    lat.value = latitude.toFixed(4);
+    lon.value = longitude.toFixed(4);
+
+    document.getElementById('dms-message').display = "hidden";
+    dmsmodal.style.display = "none";
+  
+  }
+}
+
+
+
+// ************** US Time Zones Modal *************
+if (document.getElementById('usa-tz-modal'))
+{
+  // Get the modal
+  var ustzmodal = document.getElementById("usa-tz-modal");
+
+  // Get the button that opens the modal
+  var ustzbtn = document.getElementById("get-us-tz-info");
+
+  // Get the button that imports the data
+  var ustzimportBtn = document.getElementById("import-us-tz-data");
+
+  // Get the <span> element that closes the modal
+  var ustzspan = document.getElementsByClassName("close")[0];
+
+  // When the user clicks on the button, open the modal
+  ustzbtn.onclick = function() {
+    ustzmodal.style.display = "block";
+  }
+
+  // When the user clicks on <span> (x), close the modal
+  ustzspan.onclick = function() {
+    ustzmodal.style.display = "none";
+  }
+
+  // When the user clicks anywhere outside of the modal, close it
+  window.onclick = function(event) {
+    if (event.target == ustzmodal) {
+      ustzmodal.style.display = "none";
+    }
+  }
+
+  // Import data into the form
+  ustzimportBtn.onclick = function() {
+    var tz_name = document.getElementById("us_tz");
+    var tz_val = tz_name.options[tz_name.selectedIndex].value;
+
+    var tz_int = document.getElementById('tz');
+    var tz_sign_0 = document.getElementById('tz_sign-0');
+    var tz_sign_1 = document.getElementById('tz_sign-1');
+    //var height = document.getElementById('height');
+
+    tz_int.value = Math.abs(tz_val);
+    if (parseInt(tz_val) < 0)
+    {
+        tz_sign_1.checked = true
+    }
+    else
+    {
+        tz_sign_0.checked = true
+    }
+
+    // Check the box to use US TZ labels in printout
+    var tz_label = document.getElementById('tz-label-1');
+    tz_label.checked = true;
+
+    ustzmodal.style.display = "none"; 
+  }
+}

@@ -590,9 +590,10 @@
     }
 
     async function loadFunds() {
-        const [allocData, fundsData] = await Promise.all([
+        const [allocData, fundsData, harvestData] = await Promise.all([
             api('/allocations'),
             api('/funds'),
+            api('/harvest'),
         ]);
 
         const section = document.getElementById('fundsSection');
@@ -601,13 +602,16 @@
 
         const funds = (allocData && allocData.funds) ? allocData.funds : [];
         const fundDetails = Array.isArray(fundsData) ? fundsData : [];
+        const harvest = harvestData || {};
+        const pendingHarvest = harvest.pending_harvest || {};
 
         // Only show if there's any allocation activity or main balance > 0
         const hasActivity = funds.some(f => f.total_allocated > 0);
+        const hasPending = (pendingHarvest.total || 0) > 0;
         const mainFund = fundDetails.find(f => f.fund_id === 'main');
         const mainBalance = mainFund ? mainFund.balance : 0;
 
-        if (!hasActivity && mainBalance < 1000) {
+        if (!hasActivity && !hasPending && mainBalance < 1000) {
             section.classList.add('hidden');
             return;
         }
@@ -618,11 +622,52 @@
 
         let html = '';
 
+        // Full Moon Harvest Status
+        const moonPhase = harvest.moon_phase || '';
+        const daysUntil = harvest.days_until_harvest || 0;
+        const isHarvestDay = harvest.is_harvest_day || false;
+        const totalPending = (pendingHarvest.total || 0).toFixed(2);
+        const transitTime = harvest.transit_time || null;
+        const harvestReady = harvest.harvest_ready || false;
+
+        html += `<div class="p-3 rounded-xl bg-gradient-to-r from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 mb-3">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">${harvestReady ? '&#127805;' : (isHarvestDay ? '&#127773;' : (daysUntil <= 3 ? '&#127764;' : '&#127761;'))}</span>
+                    <span class="text-sm font-medium text-white">Full Moon Harvest</span>
+                </div>
+                <span class="text-xs px-2 py-0.5 rounded-full ${harvestReady ? 'bg-amber-500/30 text-amber-300 animate-pulse' : (isHarvestDay ? 'bg-yellow-500/20 text-yellow-300' : 'bg-indigo-500/20 text-indigo-300')}">
+                    ${harvestReady ? 'Harvesting!' : (isHarvestDay ? 'Today' : `${daysUntil} days`)}
+                </span>
+            </div>
+            <div class="text-xs text-slate-400 mb-2">${moonPhase}</div>
+            ${transitTime ? `<div class="text-[10px] text-indigo-300 mb-2">Moon peaks at ${transitTime} PST</div>` : ''}
+            <div class="grid grid-cols-4 gap-2 text-center">
+                <div>
+                    <div class="text-[10px] text-slate-500">Charity</div>
+                    <div class="text-xs font-semibold text-emerald-400">$${(pendingHarvest.charity || 0).toFixed(2)}</div>
+                </div>
+                <div>
+                    <div class="text-[10px] text-slate-500">Savings</div>
+                    <div class="text-xs font-semibold text-yellow-400">$${(pendingHarvest.savings || 0).toFixed(2)}</div>
+                </div>
+                <div>
+                    <div class="text-[10px] text-slate-500">Family</div>
+                    <div class="text-xs font-semibold text-purple-400">$${(pendingHarvest.family || 0).toFixed(2)}</div>
+                </div>
+                <div>
+                    <div class="text-[10px] text-slate-500">Total</div>
+                    <div class="text-xs font-bold text-white">$${totalPending}</div>
+                </div>
+            </div>
+            <div class="text-[10px] text-slate-500 mt-2 text-center">Funds compound in pool until harvest</div>
+        </div>`;
+
         // Summary bar
         const totalAllocated = funds.reduce((sum, f) => sum + f.total_allocated, 0);
         const tradingPct = allocData.trading_pct || 80;
         html += `<div class="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-800/50 border border-slate-700/50 mb-3">
-            <span class="text-xs text-slate-500">Total set aside</span>
+            <span class="text-xs text-slate-500">Total harvested</span>
             <span class="text-sm font-semibold text-white">$${totalAllocated.toFixed(2)}</span>
         </div>`;
 
@@ -650,15 +695,15 @@
                 </div>
                 <div class="grid grid-cols-3 gap-3 text-center">
                     <div>
-                        <div class="text-xs text-slate-500">Allocated</div>
+                        <div class="text-xs text-slate-500">Harvested</div>
                         <div class="text-sm font-semibold text-${color}-400">$${fund.total_allocated.toFixed(2)}</div>
                     </div>
                     <div>
-                        <div class="text-xs text-slate-500">Pending</div>
+                        <div class="text-xs text-slate-500">In Fund</div>
                         <div class="text-sm text-slate-300">$${fund.pending.toFixed(2)}</div>
                     </div>
                     <div>
-                        <div class="text-xs text-slate-500">Transferred</div>
+                        <div class="text-xs text-slate-500">Withdrawn</div>
                         <div class="text-sm text-slate-300">$${fund.transferred.toFixed(2)}</div>
                     </div>
                 </div>
@@ -670,7 +715,7 @@
         }
 
         // Trading retention note
-        html += `<div class="text-center text-[10px] text-slate-600 mt-2">${tradingPct}% of profits stay in trading balance</div>`;
+        html += `<div class="text-center text-[10px] text-slate-600 mt-2">${tradingPct}% stays in trading &bull; ${100 - tradingPct}% harvested on full moon</div>`;
 
         container.innerHTML = html;
     }
@@ -2007,6 +2052,23 @@
                 document.getElementById('futuresWalletLabel').value = '';
             }
         });
+
+        // Tools dropdown menu toggle
+        const toolsMenuBtn = document.getElementById('toolsMenuBtn');
+        const toolsMenu = document.getElementById('toolsMenu');
+        if (toolsMenuBtn && toolsMenu) {
+            toolsMenuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toolsMenu.classList.toggle('hidden');
+            });
+
+            // Close menu when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!toolsMenu.contains(e.target) && !toolsMenuBtn.contains(e.target)) {
+                    toolsMenu.classList.add('hidden');
+                }
+            });
+        }
 
         // Reset futures account (admin only)
         document.getElementById('resetFuturesBtn')?.addEventListener('click', async () => {

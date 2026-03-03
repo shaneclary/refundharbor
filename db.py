@@ -5,6 +5,7 @@
 #   - Trade history (log of all executed trades)
 #   - Paper trading balance
 
+import json
 import logging
 import sqlite3
 from contextlib import contextmanager
@@ -333,6 +334,90 @@ def init_db() -> None:
                 tx_hash TEXT NOT NULL,
                 processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(trader_wallet, tx_hash)
+            )
+        """)
+
+        # ── STRATEGY & BACKTESTING TABLES ────────────────────────────────────
+
+        # User-defined trading strategies
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS strategies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                is_active INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Individual rules for each strategy
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS strategy_rules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                strategy_id INTEGER NOT NULL,
+                rule_type TEXT NOT NULL,
+                rule_name TEXT NOT NULL,
+                rule_config TEXT NOT NULL,
+                priority INTEGER DEFAULT 0,
+                enabled INTEGER DEFAULT 1,
+                FOREIGN KEY (strategy_id) REFERENCES strategies(id) ON DELETE CASCADE
+            )
+        """)
+
+        # Cached trader data from leaderboard
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS trader_cache (
+                wallet_address TEXT PRIMARY KEY,
+                username TEXT DEFAULT '',
+                pnl REAL DEFAULT 0,
+                volume REAL DEFAULT 0,
+                win_count INTEGER DEFAULT 0,
+                loss_count INTEGER DEFAULT 0,
+                last_fetched TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Stored backtest results
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS backtest_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                strategy_id INTEGER,
+                trader_wallet TEXT,
+                starting_balance REAL,
+                final_balance REAL,
+                total_pnl REAL,
+                win_rate REAL,
+                max_drawdown REAL,
+                result_data TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # ── FULL MOON HARVEST SYSTEM ────────────────────────────────────────────
+        # Tracks pending profits that accumulate until the full moon, then distribute
+
+        # Pending harvest amounts (funds stay in pool, amounts tracked here)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS pending_harvest (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fund_id TEXT NOT NULL,
+                amount REAL NOT NULL,
+                source_market TEXT DEFAULT '',
+                source_pnl REAL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Full moon harvest history
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS harvest_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                harvest_date TEXT NOT NULL,
+                fund_id TEXT NOT NULL,
+                amount REAL NOT NULL,
+                full_moon_date TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'completed',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
@@ -756,16 +841,22 @@ def get_wallet_activity(wallets: list[str], inactive_minutes: int = 7) -> dict:
     return {"active": active, "inactive": inactive}
 
 
-# ── PROFIT DISTRIBUTION ──────────────────────────────────────────────────────
+# ── PROFIT DISTRIBUTION (Full Moon Harvest System) ───────────────────────────
+#
+# Traditional farming approach: profits accumulate and stay in the trading pool
+# for maximum compounding, then are harvested on the full moon.
 
 
-def distribute_profit(profit_amount: float) -> None:
+def distribute_profit(profit_amount: float, source_market: str = "profit_share") -> None:
     """
-    Distribute a share of realized profit from main fund to allocation funds.
+    Track profit allocation for full moon harvest.
+
+    Instead of immediately moving funds, we track pending harvest amounts.
+    Funds stay in the main trading pool for compounding until the full moon,
+    when they are harvested (distributed to allocation funds).
 
     Called after profitable sells or winning resolutions on the main fund.
-    Only distributes if main balance is above ALLOCATION_THRESHOLD.
-    Ensures main never drops below the threshold after distribution.
+    Only tracks allocations if main balance is above ALLOCATION_THRESHOLD.
     """
     if profit_amount <= 0.01:
         return
@@ -781,46 +872,110 @@ def distribute_profit(profit_amount: float) -> None:
     if main_balance < ALLOCATION_THRESHOLD:
         return
 
+    # Calculate allocation amounts (but don't move funds yet)
     distributions = [
         ("charity", profit_amount * ALLOC_CHARITY_PCT),
         ("savings", profit_amount * ALLOC_SAVINGS_PCT),
         ("family", profit_amount * ALLOC_FAMILY_PCT),
     ]
 
-    total_to_distribute = sum(amt for _, amt in distributions)
-    if total_to_distribute < 0.01:
+    total_pending = sum(amt for _, amt in distributions)
+    if total_pending < 0.01:
         return
 
-    # Don't let main drop below threshold
-    headroom = main_balance - ALLOCATION_THRESHOLD
-    if headroom < 0.01:
-        return
-    if total_to_distribute > headroom:
-        scale = headroom / total_to_distribute
-        distributions = [(fid, amt * scale) for fid, amt in distributions]
-        total_to_distribute = headroom
-
-    # Debit main
-    update_fund_balance("main", main_balance - total_to_distribute)
-
-    # Credit allocation funds
+    # Track pending harvest amounts (funds stay in pool for compounding)
     for fund_id, amount in distributions:
         if amount >= 0.01:
-            current = get_fund_balance(fund_id)
-            update_fund_balance(fund_id, current + amount)
-            record_allocation(
-                fund_name=fund_id.capitalize(),
-                amount=amount,
-                source_market="profit_share",
-                source_pnl=profit_amount,
-            )
+            add_pending_harvest(fund_id, amount, source_market, profit_amount)
 
     log.info(
-        "Profit allocation: $%.2f profit → distributed $%.2f (%s)",
+        "Pending harvest tracked: $%.2f profit → $%.2f pending (%s) - awaiting full moon",
         profit_amount,
-        total_to_distribute,
+        total_pending,
         ", ".join(f"{fid}=${amt:.2f}" for fid, amt in distributions if amt >= 0.01),
     )
+
+
+def trigger_full_moon_harvest() -> dict:
+    """
+    Trigger the full moon harvest - distribute all pending funds.
+
+    This is called when the full moon occurs (checked by the harvest scheduler).
+    Moves accumulated funds from main to allocation funds.
+
+    Returns dict with harvest results.
+    """
+    from full_moon import get_full_moon_for_date, is_full_moon_day
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    now = datetime.now(ZoneInfo("America/Los_Angeles"))
+    full_moon_date = get_full_moon_for_date(now)
+
+    if not full_moon_date:
+        return {
+            "harvested": False,
+            "reason": "Not a full moon day",
+            "next_check": "Wait for full moon",
+        }
+
+    results = {
+        "harvested": True,
+        "full_moon_date": full_moon_date,
+        "funds": {},
+        "total_harvested": 0,
+    }
+
+    # Harvest each fund
+    for fund_id in ["charity", "savings", "family"]:
+        if is_harvest_done_for_moon(full_moon_date, fund_id):
+            results["funds"][fund_id] = {"amount": 0, "status": "already_harvested"}
+            continue
+
+        amount = harvest_pending_funds(fund_id, full_moon_date)
+        results["funds"][fund_id] = {"amount": amount, "status": "harvested"}
+        results["total_harvested"] += amount
+
+    log.info(
+        "🌕 Full Moon Harvest complete: $%.2f distributed on %s",
+        results["total_harvested"],
+        full_moon_date,
+    )
+
+    return results
+
+
+def get_harvest_dashboard() -> dict:
+    """
+    Get harvest status for dashboard display.
+
+    Shows pending amounts building up and countdown to full moon.
+    """
+    from full_moon import get_harvest_status, format_moon_phase_display
+
+    moon_status = get_harvest_status()
+    pending = get_all_pending_harvests()
+
+    # Calculate totals
+    pending_by_fund = {p["fund_id"]: p["pending_amount"] for p in pending}
+    total_pending = sum(p["pending_amount"] for p in pending)
+
+    return {
+        "moon_phase": format_moon_phase_display(moon_status["days_until_full_moon"]),
+        "days_until_harvest": moon_status["days_until_full_moon"],
+        "next_harvest_date": moon_status["next_full_moon_date"],
+        "is_harvest_day": moon_status["is_full_moon_day"],
+        "harvest_window_open": moon_status["harvest_window_open"],
+        "transit_time": moon_status.get("transit_time"),  # Moon's peak from NASA data
+        "harvest_ready": moon_status.get("harvest_ready", False),  # Within 30min of transit
+        "pending_harvest": {
+            "charity": pending_by_fund.get("charity", 0),
+            "savings": pending_by_fund.get("savings", 0),
+            "family": pending_by_fund.get("family", 0),
+            "total": total_pending,
+        },
+        "recent_harvests": get_harvest_history(5),
+    }
 
 
 # ── FUND ALLOCATIONS ─────────────────────────────────────────────────────────
@@ -862,6 +1017,124 @@ def get_recent_allocations(limit: int = 20) -> list[dict]:
             (limit,),
         ).fetchall()
         return [dict(row) for row in rows]
+
+
+# ── FULL MOON HARVEST ────────────────────────────────────────────────────────
+
+
+def add_pending_harvest(fund_id: str, amount: float, source_market: str = "", source_pnl: float = 0) -> None:
+    """
+    Track a pending harvest amount for a fund.
+    Funds stay in the trading pool and compound until the full moon.
+    """
+    if amount < 0.01:
+        return
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO pending_harvest (fund_id, amount, source_market, source_pnl)
+            VALUES (?, ?, ?, ?)
+            """,
+            (fund_id, amount, source_market, source_pnl),
+        )
+
+
+def get_pending_harvest_total(fund_id: str) -> float:
+    """Get total pending harvest amount for a fund."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COALESCE(SUM(amount), 0) as total FROM pending_harvest WHERE fund_id = ?",
+            (fund_id,),
+        ).fetchone()
+        return row["total"] if row else 0.0
+
+
+def get_all_pending_harvests() -> list[dict]:
+    """Get pending harvest totals for all funds."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT
+                fund_id,
+                SUM(amount) as pending_amount,
+                COUNT(*) as num_entries,
+                MIN(created_at) as earliest,
+                MAX(created_at) as latest
+            FROM pending_harvest
+            GROUP BY fund_id
+        """).fetchall()
+        return [dict(row) for row in rows]
+
+
+def harvest_pending_funds(fund_id: str, full_moon_date: str) -> float:
+    """
+    Harvest pending funds for a fund on the full moon.
+    Moves funds from main balance to the allocation fund.
+    Returns the amount harvested.
+    """
+    pending = get_pending_harvest_total(fund_id)
+    if pending < 0.01:
+        return 0.0
+
+    from datetime import datetime
+
+    # Get main balance and ensure we have enough
+    main_balance = get_fund_balance("main")
+    harvest_amount = min(pending, main_balance)
+
+    if harvest_amount < 0.01:
+        return 0.0
+
+    # Debit main, credit the allocation fund
+    update_fund_balance("main", main_balance - harvest_amount)
+    fund_balance = get_fund_balance(fund_id)
+    update_fund_balance(fund_id, fund_balance + harvest_amount)
+
+    # Record the harvest
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO harvest_history (harvest_date, fund_id, amount, full_moon_date)
+            VALUES (?, ?, ?, ?)
+            """,
+            (datetime.now().strftime("%Y-%m-%d"), fund_id, harvest_amount, full_moon_date),
+        )
+        # Clear the pending entries for this fund
+        conn.execute("DELETE FROM pending_harvest WHERE fund_id = ?", (fund_id,))
+
+    # Also record as allocation for tracking
+    record_allocation(
+        fund_name=fund_id.capitalize(),
+        amount=harvest_amount,
+        source_market="full_moon_harvest",
+        source_pnl=harvest_amount,
+    )
+
+    log.info(
+        "Full Moon Harvest: %s received $%.2f (full moon: %s)",
+        fund_id, harvest_amount, full_moon_date
+    )
+
+    return harvest_amount
+
+
+def get_harvest_history(limit: int = 20) -> list[dict]:
+    """Get recent harvest history."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM harvest_history ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def is_harvest_done_for_moon(full_moon_date: str, fund_id: str) -> bool:
+    """Check if a fund has already been harvested for a given full moon."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM harvest_history WHERE full_moon_date = ? AND fund_id = ?",
+            (full_moon_date, fund_id),
+        ).fetchone()
+        return row is not None
 
 
 # ── MONTHLY DISTRIBUTIONS ────────────────────────────────────────────────────
@@ -2355,3 +2628,335 @@ def get_futures_performance_summary(account_id: int = 1) -> dict:
         data["win_rate"] = (wins / resolved * 100) if resolved > 0 else 0.0
 
         return data
+
+
+# ── STRATEGIES ───────────────────────────────────────────────────────────────
+
+
+def create_strategy(name: str, description: str = "", is_active: bool = False) -> int:
+    """Create a new strategy. Returns the strategy ID."""
+    with get_conn() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO strategies (name, description, is_active)
+            VALUES (?, ?, ?)
+            """,
+            (name, description, 1 if is_active else 0),
+        )
+        return cursor.lastrowid
+
+
+def get_strategy(strategy_id: int) -> Optional[dict]:
+    """Get a strategy by ID."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM strategies WHERE id = ?",
+            (strategy_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_all_strategies() -> list[dict]:
+    """Get all strategies."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM strategies ORDER BY created_at DESC"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def update_strategy(
+    strategy_id: int,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    is_active: Optional[bool] = None,
+) -> bool:
+    """Update a strategy. Returns True if found and updated."""
+    updates = []
+    params = []
+    if name is not None:
+        updates.append("name = ?")
+        params.append(name)
+    if description is not None:
+        updates.append("description = ?")
+        params.append(description)
+    if is_active is not None:
+        updates.append("is_active = ?")
+        params.append(1 if is_active else 0)
+
+    if not updates:
+        return False
+
+    params.append(strategy_id)
+    with get_conn() as conn:
+        cursor = conn.execute(
+            f"UPDATE strategies SET {', '.join(updates)} WHERE id = ?",
+            params,
+        )
+        return cursor.rowcount > 0
+
+
+def delete_strategy(strategy_id: int) -> bool:
+    """Delete a strategy and all its rules. Returns True if found and deleted."""
+    with get_conn() as conn:
+        cursor = conn.execute(
+            "DELETE FROM strategies WHERE id = ?",
+            (strategy_id,),
+        )
+        return cursor.rowcount > 0
+
+
+def set_active_strategy(strategy_id: int) -> bool:
+    """Set a strategy as active, deactivating all others."""
+    with get_conn() as conn:
+        conn.execute("UPDATE strategies SET is_active = 0")
+        cursor = conn.execute(
+            "UPDATE strategies SET is_active = 1 WHERE id = ?",
+            (strategy_id,),
+        )
+        return cursor.rowcount > 0
+
+
+def get_active_strategy() -> Optional[dict]:
+    """Get the currently active strategy."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM strategies WHERE is_active = 1 LIMIT 1"
+        ).fetchone()
+        return dict(row) if row else None
+
+
+# ── STRATEGY RULES ───────────────────────────────────────────────────────────
+
+
+def add_strategy_rule(
+    strategy_id: int,
+    rule_type: str,
+    rule_name: str,
+    rule_config: dict | str,
+    priority: int = 0,
+    enabled: bool = True,
+) -> int:
+    """Add a rule to a strategy. Returns the rule ID."""
+    # Serialize config dict to JSON string
+    config_str = json.dumps(rule_config) if isinstance(rule_config, dict) else rule_config
+    with get_conn() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO strategy_rules (strategy_id, rule_type, rule_name, rule_config, priority, enabled)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (strategy_id, rule_type, rule_name, config_str, priority, 1 if enabled else 0),
+        )
+        return cursor.lastrowid
+
+
+def get_strategy_rules(strategy_id: int) -> list[dict]:
+    """Get all rules for a strategy, ordered by priority."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM strategy_rules WHERE strategy_id = ? ORDER BY priority DESC, id ASC",
+            (strategy_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_strategy_rule(rule_id: int) -> Optional[dict]:
+    """Get a single rule by ID."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM strategy_rules WHERE id = ?",
+            (rule_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def update_strategy_rule(
+    rule_id: int,
+    rule_config: Optional[dict | str] = None,
+    priority: Optional[int] = None,
+    enabled: Optional[bool] = None,
+) -> bool:
+    """Update a strategy rule."""
+    updates = []
+    params = []
+    if rule_config is not None:
+        updates.append("rule_config = ?")
+        config_str = json.dumps(rule_config) if isinstance(rule_config, dict) else rule_config
+        params.append(config_str)
+    if priority is not None:
+        updates.append("priority = ?")
+        params.append(priority)
+    if enabled is not None:
+        updates.append("enabled = ?")
+        params.append(1 if enabled else 0)
+
+    if not updates:
+        return False
+
+    params.append(rule_id)
+    with get_conn() as conn:
+        cursor = conn.execute(
+            f"UPDATE strategy_rules SET {', '.join(updates)} WHERE id = ?",
+            params,
+        )
+        return cursor.rowcount > 0
+
+
+def delete_strategy_rule(rule_id: int) -> bool:
+    """Delete a strategy rule."""
+    with get_conn() as conn:
+        cursor = conn.execute(
+            "DELETE FROM strategy_rules WHERE id = ?",
+            (rule_id,),
+        )
+        return cursor.rowcount > 0
+
+
+def get_strategy_with_rules(strategy_id: int) -> Optional[dict]:
+    """Get a strategy with all its rules."""
+    strategy = get_strategy(strategy_id)
+    if not strategy:
+        return None
+    strategy["rules"] = get_strategy_rules(strategy_id)
+    return strategy
+
+
+# ── TRADER CACHE ─────────────────────────────────────────────────────────────
+
+
+def upsert_trader_cache(
+    wallet_address: str,
+    username: str = "",
+    pnl: float = 0,
+    volume: float = 0,
+    win_count: int = 0,
+    loss_count: int = 0,
+) -> None:
+    """Insert or update cached trader data."""
+    with get_conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO trader_cache (wallet_address, username, pnl, volume, win_count, loss_count, last_fetched)
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(wallet_address) DO UPDATE SET
+                username = excluded.username,
+                pnl = excluded.pnl,
+                volume = excluded.volume,
+                win_count = excluded.win_count,
+                loss_count = excluded.loss_count,
+                last_fetched = CURRENT_TIMESTAMP
+            """,
+            (wallet_address.lower(), username, pnl, volume, win_count, loss_count),
+        )
+
+
+def get_trader_cache(wallet_address: str) -> Optional[dict]:
+    """Get cached trader data."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM trader_cache WHERE wallet_address = ?",
+            (wallet_address.lower(),),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_all_cached_traders() -> list[dict]:
+    """Get all cached traders, sorted by PnL."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM trader_cache ORDER BY pnl DESC"
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_trader_cache_age_seconds(wallet_address: str) -> Optional[float]:
+    """Get how many seconds since trader cache was last updated."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT (julianday('now') - julianday(last_fetched)) * 86400 as age_seconds FROM trader_cache WHERE wallet_address = ?",
+            (wallet_address.lower(),),
+        ).fetchone()
+        return row["age_seconds"] if row else None
+
+
+def clear_trader_cache() -> int:
+    """Clear all cached trader data. Returns count deleted."""
+    with get_conn() as conn:
+        cursor = conn.execute("DELETE FROM trader_cache")
+        return cursor.rowcount
+
+
+# ── BACKTEST RESULTS ─────────────────────────────────────────────────────────
+
+
+def save_backtest_result(
+    strategy_id: Optional[int],
+    trader_wallet: str,
+    starting_balance: float,
+    final_balance: float,
+    total_pnl: float,
+    win_rate: float,
+    max_drawdown: float,
+    result_data: dict | str,
+) -> int:
+    """Save a backtest result. Returns the result ID."""
+    # Serialize result_data dict to JSON string
+    data_str = json.dumps(result_data) if isinstance(result_data, dict) else result_data
+    with get_conn() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO backtest_results
+            (strategy_id, trader_wallet, starting_balance, final_balance, total_pnl, win_rate, max_drawdown, result_data)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (strategy_id, trader_wallet.lower() if trader_wallet else None,
+             starting_balance, final_balance, total_pnl, win_rate, max_drawdown, data_str),
+        )
+        return cursor.lastrowid
+
+
+def get_backtest_result(result_id: int) -> Optional[dict]:
+    """Get a backtest result by ID."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM backtest_results WHERE id = ?",
+            (result_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_backtest_results(limit: int = 50, strategy_id: Optional[int] = None) -> list[dict]:
+    """Get recent backtest results, optionally filtered by strategy."""
+    with get_conn() as conn:
+        if strategy_id is not None:
+            rows = conn.execute(
+                "SELECT * FROM backtest_results WHERE strategy_id = ? ORDER BY created_at DESC LIMIT ?",
+                (strategy_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM backtest_results ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def delete_backtest_result(result_id: int) -> bool:
+    """Delete a backtest result."""
+    with get_conn() as conn:
+        cursor = conn.execute(
+            "DELETE FROM backtest_results WHERE id = ?",
+            (result_id,),
+        )
+        return cursor.rowcount > 0
+
+
+def get_best_backtest_for_strategy(strategy_id: int) -> Optional[dict]:
+    """Get the best backtest result (highest PnL) for a strategy."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM backtest_results WHERE strategy_id = ? ORDER BY total_pnl DESC LIMIT 1",
+            (strategy_id,),
+        ).fetchone()
+        return dict(row) if row else None

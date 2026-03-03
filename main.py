@@ -46,7 +46,7 @@ from portfolio import refresh_all_portfolios
 from market_data import fetch_market_data
 from position_manager import evaluate, OrderIntent
 from reconciler import reconcile
-from reserve import reserve_cycling_loop
+from reserve import reserve_cycling_loop, full_moon_harvest_loop
 from resolver import resolution_loop
 from watcher import TradeSignal, start_watchers
 
@@ -348,6 +348,7 @@ async def main(mode: str) -> None:
         resolution_loop(),  # always run — resolves positions regardless of mode
         monthly_distribution_loop(),  # sweep allocation funds on 1st of month
         reserve_cycling_loop(),  # redistribute reserve to trading pool on schedule
+        full_moon_harvest_loop(),  # harvest profits on the full moon (PST)
         # Futures copy-trading (BTC-PERP from Hyperliquid)
         start_futures_watchers(futures_queue),
         process_futures_signals(futures_queue),

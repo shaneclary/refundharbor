@@ -774,6 +774,30 @@ async def api_allocations(user: dict = Depends(require_auth)):
     }
 
 
+@app.get("/api/harvest")
+async def api_harvest_status(user: dict = Depends(require_auth)):
+    """Get full moon harvest status and pending amounts."""
+    from db import get_harvest_dashboard
+    return get_harvest_dashboard()
+
+
+@app.post("/api/harvest/trigger")
+async def api_trigger_harvest(request: Request, user: dict = Depends(require_operator)):
+    """Manually trigger harvest (for testing or if scheduler missed it)."""
+    from db import trigger_full_moon_harvest
+    from full_moon import is_full_moon_day
+
+    if not is_full_moon_day():
+        return {
+            "error": "Cannot harvest - not a full moon day",
+            "message": "Harvest can only occur on the full moon. Check /api/harvest for status."
+        }
+
+    result = trigger_full_moon_harvest()
+    log_activity("manual_harvest", f"total=${result.get('total_harvested', 0):.2f}", request.client.host if request.client else "")
+    return result
+
+
 # ── STRATEGY SIMULATOR ─────────────────────────────────────────────────────
 
 
@@ -1977,6 +2001,450 @@ async def api_futures_margin_tiers(user: dict = Depends(require_auth)):
         "current_wallet_pct": current_wallet_pct * 100,
         "tiers": tiers,
     }
+
+
+# ── STRATEGY ROUTES ──────────────────────────────────────────────────────────
+
+
+from db import (
+    create_strategy,
+    get_strategy,
+    get_all_strategies,
+    update_strategy,
+    delete_strategy,
+    set_active_strategy,
+    get_active_strategy,
+    add_strategy_rule,
+    get_strategy_rules,
+    get_strategy_rule,
+    update_strategy_rule,
+    delete_strategy_rule,
+    get_strategy_with_rules,
+    get_backtest_results,
+    get_backtest_result,
+    delete_backtest_result,
+)
+
+
+class CreateStrategyRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: str = Field("", max_length=500)
+    is_active: bool = False
+
+
+class UpdateStrategyRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    is_active: bool | None = None
+
+
+class AddRuleRequest(BaseModel):
+    rule_type: str = Field(..., max_length=20)
+    rule_name: str = Field(..., max_length=50)
+    rule_config: str = "{}"
+    priority: int = 0
+    enabled: bool = True
+
+
+class UpdateRuleRequest(BaseModel):
+    rule_config: str | None = None
+    priority: int | None = None
+    enabled: bool | None = None
+
+
+@app.get("/api/strategies")
+async def api_list_strategies(user: dict = Depends(require_auth)):
+    """List all strategies."""
+    strategies = get_all_strategies()
+    return {"strategies": strategies}
+
+
+@app.post("/api/strategies")
+async def api_create_strategy(req: CreateStrategyRequest, request: Request, user: dict = Depends(require_auth)):
+    """Create a new strategy."""
+    strategy_id = create_strategy(req.name, req.description, req.is_active)
+    strategy = get_strategy(strategy_id)
+    log_activity("create_strategy", f"id={strategy_id} name={req.name}", request.client.host if request.client else "")
+    return {"success": True, "strategy": strategy}
+
+
+@app.get("/api/strategies/{strategy_id}")
+async def api_get_strategy(strategy_id: int, user: dict = Depends(require_auth)):
+    """Get a strategy with all its rules."""
+    strategy = get_strategy_with_rules(strategy_id)
+    if not strategy:
+        return {"error": "Strategy not found"}
+    return strategy
+
+
+@app.patch("/api/strategies/{strategy_id}")
+async def api_update_strategy(strategy_id: int, req: UpdateStrategyRequest, request: Request, user: dict = Depends(require_auth)):
+    """Update a strategy."""
+    updated = update_strategy(
+        strategy_id,
+        name=req.name,
+        description=req.description,
+        is_active=req.is_active,
+    )
+    if not updated:
+        return {"error": "Strategy not found"}
+    log_activity("update_strategy", f"id={strategy_id}", request.client.host if request.client else "")
+    return {"success": True, "strategy": get_strategy(strategy_id)}
+
+
+@app.delete("/api/strategies/{strategy_id}")
+async def api_delete_strategy(strategy_id: int, request: Request, user: dict = Depends(require_auth)):
+    """Delete a strategy and all its rules."""
+    deleted = delete_strategy(strategy_id)
+    if not deleted:
+        return {"error": "Strategy not found"}
+    log_activity("delete_strategy", f"id={strategy_id}", request.client.host if request.client else "")
+    return {"success": True}
+
+
+@app.post("/api/strategies/{strategy_id}/activate")
+async def api_activate_strategy(strategy_id: int, request: Request, user: dict = Depends(require_auth)):
+    """Set a strategy as the active one."""
+    success = set_active_strategy(strategy_id)
+    if not success:
+        return {"error": "Strategy not found"}
+    log_activity("activate_strategy", f"id={strategy_id}", request.client.host if request.client else "")
+    return {"success": True}
+
+
+@app.get("/api/strategies/active")
+async def api_get_active_strategy(user: dict = Depends(require_auth)):
+    """Get the currently active strategy."""
+    strategy = get_active_strategy()
+    if strategy:
+        strategy = get_strategy_with_rules(strategy["id"])
+    return {"strategy": strategy}
+
+
+# ── STRATEGY RULES ROUTES ────────────────────────────────────────────────────
+
+
+@app.post("/api/strategies/{strategy_id}/rules")
+async def api_add_rule(strategy_id: int, req: AddRuleRequest, request: Request, user: dict = Depends(require_auth)):
+    """Add a rule to a strategy."""
+    # Verify strategy exists
+    if not get_strategy(strategy_id):
+        return {"error": "Strategy not found"}
+
+    rule_id = add_strategy_rule(
+        strategy_id=strategy_id,
+        rule_type=req.rule_type,
+        rule_name=req.rule_name,
+        rule_config=req.rule_config,
+        priority=req.priority,
+        enabled=req.enabled,
+    )
+    rule = get_strategy_rule(rule_id)
+    log_activity("add_rule", f"strategy={strategy_id} rule={req.rule_name}", request.client.host if request.client else "")
+    return {"success": True, "rule": rule}
+
+
+@app.get("/api/strategies/{strategy_id}/rules")
+async def api_list_rules(strategy_id: int, user: dict = Depends(require_auth)):
+    """Get all rules for a strategy."""
+    rules = get_strategy_rules(strategy_id)
+    return {"rules": rules}
+
+
+@app.patch("/api/strategies/{strategy_id}/rules/{rule_id}")
+async def api_update_rule(strategy_id: int, rule_id: int, req: UpdateRuleRequest, request: Request, user: dict = Depends(require_auth)):
+    """Update a strategy rule."""
+    updated = update_strategy_rule(
+        rule_id,
+        rule_config=req.rule_config,
+        priority=req.priority,
+        enabled=req.enabled,
+    )
+    if not updated:
+        return {"error": "Rule not found"}
+    log_activity("update_rule", f"rule={rule_id}", request.client.host if request.client else "")
+    return {"success": True, "rule": get_strategy_rule(rule_id)}
+
+
+@app.delete("/api/strategies/{strategy_id}/rules/{rule_id}")
+async def api_delete_rule(strategy_id: int, rule_id: int, request: Request, user: dict = Depends(require_auth)):
+    """Delete a strategy rule."""
+    deleted = delete_strategy_rule(rule_id)
+    if not deleted:
+        return {"error": "Rule not found"}
+    log_activity("delete_rule", f"rule={rule_id}", request.client.host if request.client else "")
+    return {"success": True}
+
+
+@app.get("/api/rule-templates")
+async def api_rule_templates(user: dict = Depends(require_auth)):
+    """Get available rule types and their configuration schemas."""
+    from strategy_engine import RuleRegistry
+    templates = RuleRegistry.get_templates()
+
+    # Group by type
+    grouped = {"entry": [], "exit": [], "sizing": [], "risk": []}
+    for t in templates:
+        grouped[t["type"]].append(t)
+
+    return {"templates": grouped}
+
+
+# ── TRADER DISCOVERY ROUTES ──────────────────────────────────────────────────
+
+
+class LeaderboardRequest(BaseModel):
+    period: str = Field("7d", max_length=10)
+    limit: int = Field(100, ge=1, le=500)
+
+
+class AnalyzeTraderRequest(BaseModel):
+    wallet: str = Field(..., min_length=1, max_length=100)
+
+
+@app.get("/api/traders/leaderboard")
+async def api_traders_leaderboard(
+    period: str = "7d",
+    limit: int = 100,
+    min_win_rate: float = 0,
+    user: dict = Depends(require_auth),
+):
+    """Fetch top traders from Polymarket leaderboard."""
+    from trader_discovery import fetch_leaderboard
+
+    traders = await fetch_leaderboard(period=period, limit=limit)
+
+    # Filter by win rate if specified
+    if min_win_rate > 0:
+        filtered = []
+        for t in traders:
+            wins = t.get("win_count", 0)
+            losses = t.get("loss_count", 0)
+            total = wins + losses
+            if total > 0:
+                wr = wins / total * 100
+                if wr >= min_win_rate:
+                    t["win_rate"] = round(wr, 1)
+                    filtered.append(t)
+        traders = filtered
+
+    return {"traders": traders, "count": len(traders), "period": period}
+
+
+@app.get("/api/traders/{wallet}/analysis")
+async def api_analyze_trader(wallet: str, user: dict = Depends(require_auth)):
+    """Analyze a trader's performance."""
+    from trader_discovery import analyze_trader
+
+    analysis = await analyze_trader(wallet)
+    return analysis
+
+
+@app.get("/api/traders/{wallet}/history")
+async def api_trader_history(wallet: str, hours: int = 720, user: dict = Depends(require_auth)):
+    """Get trade history for a trader."""
+    from trader_discovery import fetch_trader_history
+
+    trades = await fetch_trader_history(wallet, hours=hours)
+    return {"trades": trades, "count": len(trades)}
+
+
+@app.post("/api/traders/{wallet}/track")
+async def api_track_trader(wallet: str, request: Request, user: dict = Depends(require_auth)):
+    """Add a trader to the tracked wallets list."""
+    import re
+
+    addr = wallet.strip().lower()
+    if not re.match(r"^0x[0-9a-f]{40}$", addr):
+        return {"error": "Invalid Ethereum address"}
+
+    # Get trader info for label
+    from trader_discovery import analyze_trader
+    analysis = await analyze_trader(addr)
+    label = analysis.get("username", "")
+
+    added = add_tracked_wallet(addr, label)
+    if not added:
+        return {"error": "Wallet already tracked"}
+
+    log_activity("track_trader", f"address={addr}", request.client.host if request.client else "")
+    return {"success": True, "address": addr, "label": label}
+
+
+# ── BACKTEST ROUTES ──────────────────────────────────────────────────────────
+
+
+class RunBacktestRequest(BaseModel):
+    hours: int = Field(168, ge=1, le=8760)  # Default 1 week
+    trader_wallet: str | None = Field(None, max_length=100)
+    strategy_id: int | None = None
+    starting_balance: float = Field(1000.0, gt=0, le=10_000_000)
+    max_trade_pct: float = Field(0.15, gt=0, le=1.0)
+    max_wallet_pct: float = Field(0.50, gt=0, le=1.0)
+    max_market_pct: float = Field(0.15, gt=0, le=1.0)
+    slippage_bps: float = Field(10.0, ge=0, le=1000)
+    save_result: bool = False
+
+
+@app.post("/api/backtest")
+async def api_run_backtest(req: RunBacktestRequest, request: Request, user: dict = Depends(require_auth)):
+    """Run a backtest with the specified parameters."""
+    from backtest_engine import BacktestEngine, BacktestParams
+
+    # Get trade data
+    trades = get_trades_for_simulation(
+        hours=req.hours,
+        trader_wallet=req.trader_wallet,
+    )
+
+    if not trades:
+        return {"error": "No trades found for the specified parameters"}
+
+    # Run backtest
+    params = BacktestParams(
+        starting_balance=req.starting_balance,
+        max_trade_pct=req.max_trade_pct,
+        max_wallet_pct=req.max_wallet_pct,
+        max_market_pct=req.max_market_pct,
+        slippage_bps=req.slippage_bps,
+        strategy_id=req.strategy_id,
+    )
+
+    engine = BacktestEngine(strategy_id=req.strategy_id)
+    result = engine.run(trades, params, req.trader_wallet)
+
+    # Optionally save result
+    result_id = None
+    if req.save_result:
+        from backtest_engine import save_backtest_result
+        result_id = save_backtest_result(result, req.trader_wallet or "")
+        log_activity("save_backtest", f"id={result_id}", request.client.host if request.client else "")
+
+    return {
+        "summary": {
+            "starting_balance": result.params.starting_balance,
+            "final_balance": round(result.sim_result.final_balance, 2),
+            "total_pnl": round(result.metrics.total_pnl, 2),
+            "pnl_pct": round(result.metrics.pnl_pct, 2),
+            "win_rate": round(result.metrics.win_rate, 1),
+            "profit_factor": round(result.metrics.profit_factor, 2),
+            "total_trades": result.metrics.total_trades,
+            "winning_trades": result.metrics.winning_trades,
+            "losing_trades": result.metrics.losing_trades,
+            "max_drawdown": round(result.metrics.max_drawdown, 2),
+            "max_drawdown_pct": round(result.metrics.max_drawdown_pct, 1),
+            "sharpe_ratio": result.metrics.sharpe_ratio,
+            "sortino_ratio": result.metrics.sortino_ratio,
+        },
+        "equity_curve": [
+            {"timestamp": e.timestamp, "balance": e.balance, "pnl": e.pnl, "drawdown": e.drawdown}
+            for e in result.equity_curve
+        ],
+        "trades": result.trades[:100],  # Limit trades in response
+        "trade_count": len(trades),
+        "strategy_name": result.strategy_name,
+        "result_id": result_id,
+    }
+
+
+@app.get("/api/backtest/results")
+async def api_list_backtest_results(
+    limit: int = 50,
+    strategy_id: int | None = None,
+    user: dict = Depends(require_auth),
+):
+    """List saved backtest results."""
+    results = get_backtest_results(limit=limit, strategy_id=strategy_id)
+
+    return {
+        "results": [
+            {
+                "id": r["id"],
+                "strategy_id": r["strategy_id"],
+                "trader_wallet": r["trader_wallet"],
+                "starting_balance": r["starting_balance"],
+                "final_balance": r["final_balance"],
+                "total_pnl": r["total_pnl"],
+                "win_rate": r["win_rate"],
+                "max_drawdown": r["max_drawdown"],
+                "created_at": r["created_at"],
+            }
+            for r in results
+        ],
+        "count": len(results),
+    }
+
+
+@app.get("/api/backtest/results/{result_id}")
+async def api_get_backtest_result(result_id: int, user: dict = Depends(require_auth)):
+    """Get a specific backtest result with full details."""
+    result = get_backtest_result(result_id)
+    if not result:
+        return {"error": "Result not found"}
+
+    # Parse stored JSON data
+    result_data = {}
+    if result.get("result_data"):
+        try:
+            result_data = json.loads(result["result_data"])
+        except Exception:
+            pass
+
+    return {
+        **result,
+        "parsed_data": result_data,
+    }
+
+
+@app.delete("/api/backtest/results/{result_id}")
+async def api_delete_backtest_result(result_id: int, request: Request, user: dict = Depends(require_auth)):
+    """Delete a backtest result."""
+    deleted = delete_backtest_result(result_id)
+    if not deleted:
+        return {"error": "Result not found"}
+    log_activity("delete_backtest", f"id={result_id}", request.client.host if request.client else "")
+    return {"success": True}
+
+
+# ── PAGE ROUTES FOR NEW TEMPLATES ────────────────────────────────────────────
+
+
+STRATEGIES_TEMPLATE_PATH = Path(__file__).parent / "templates" / "strategies.html"
+BACKTEST_TEMPLATE_PATH = Path(__file__).parent / "templates" / "backtest.html"
+TRADERS_TEMPLATE_PATH = Path(__file__).parent / "templates" / "traders.html"
+
+
+@app.get("/strategies", response_class=HTMLResponse)
+async def strategies_page(request: Request):
+    """Strategy builder page."""
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    if STRATEGIES_TEMPLATE_PATH.exists():
+        return STRATEGIES_TEMPLATE_PATH.read_text(encoding="utf-8")
+    return HTMLResponse("<h1>Strategies page not found</h1>", status_code=404)
+
+
+@app.get("/backtest", response_class=HTMLResponse)
+async def backtest_page(request: Request):
+    """Backtesting page."""
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    if BACKTEST_TEMPLATE_PATH.exists():
+        return BACKTEST_TEMPLATE_PATH.read_text(encoding="utf-8")
+    return HTMLResponse("<h1>Backtest page not found</h1>", status_code=404)
+
+
+@app.get("/traders", response_class=HTMLResponse)
+async def traders_page(request: Request):
+    """Trader discovery page."""
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    if TRADERS_TEMPLATE_PATH.exists():
+        return TRADERS_TEMPLATE_PATH.read_text(encoding="utf-8")
+    return HTMLResponse("<h1>Traders page not found</h1>", status_code=404)
 
 
 if __name__ == "__main__":

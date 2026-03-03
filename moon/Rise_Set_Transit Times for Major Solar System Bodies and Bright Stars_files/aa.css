@@ -1,0 +1,280 @@
+:target::before {
+    content: "";
+    display: block;
+    height: 50px;
+    /* fixed header height*/
+    margin: -50px 0 0;
+    /* negative fixed header height */
+}
+
+.aa-hero__callout {
+    text-align: center;
+    max-width: auto;
+    background-color: #05053e;
+    padding: 2rem;
+}
+
+.usa-hero {
+    background-image: url(/img/hero.png)
+}
+
+.usa-form-group--zone,
+.usa-form-group--lat,
+.usa-form-group--lon,
+.usa-form-group--city,
+.usa-form-group--state,
+.usa-form-group--time,
+.usa-form-group--date,
+.usa-input--intv-mag,
+.usa-input--intv-box {
+    -webkit-box-flex: 0;
+    -ms-flex: 0 0 auto;
+    flex: 0 0 auto;
+    margin-right: 1rem;
+    width: 3rem;
+}
+
+.usa-form-group--zone {
+    width: 5rem;
+}
+
+.usa-form-group--city,
+.usa-form-group--state {
+    align-content: center;
+    width: 12rem;
+}
+
+.input-date,
+.input-location,
+.input-timezone {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+}
+
+.usa-form-group--lat,
+.usa-form-group--lon,
+.usa-input--intv-mag,
+.usa-input--intv-unit,
+.usa-input--intv-box {
+    width: 6rem;
+}
+
+.usa-form-group--date,
+.usa-input--intv-unit,
+.usa-form-group--time {
+    width: 8rem;
+}
+
+.usa-form-group--time-s {
+    width: 11rem;
+}
+
+.usa-form-group--latd,
+.usa-form-group--latm,
+.usa-form-group--lats,
+.usa-form-group--lond,
+.usa-form-group--lonm,
+.usa-form-group--lons {
+    width: 4rem;
+    display: inline-block;
+}
+
+[href^=http]:after {
+    background: url(/uswds/img/external-link.svg) no-repeat 0 0;
+    background-size: 100%;
+    content: "";
+    display: inline-block;
+    height: .65em;
+    margin-bottom: -1px;
+    margin-left: .25rem;
+    width: .65em;
+}
+
+[href$=pdf]:after,
+.pdf-file {
+    background: url(/uswds/img/file-pdf.svg) no-repeat 0 0;
+    background-size: 100%;
+    content: "";
+    display: inline-block;
+    height: .7em;
+    margin-bottom: -1px;
+    margin-left: .25rem;
+    width: .7em;
+}
+
+.download {
+    background: url(/uswds/img/angle-arrow-down.svg) no-repeat 0 0;
+    background-size: 100%;
+    content: "";
+    display: inline-block;
+    height: .65em;
+    margin-bottom: -1px;
+    margin-left: .25rem;
+    width: .65em;
+}
+
+.red {
+    color: red;
+}
+
+.seagreen {
+    color: seagreen;
+}
+
+.blue {
+    color: blue;
+}
+
+.formula {
+    color: #9900ff;
+}
+
+.center {
+    text-align: center;
+}
+
+.pub-description {
+    margin-left: 1em;
+    margin-top: 0.25em;
+}
+
+.small {
+    font-size: 14px;
+}
+
+.code {
+    margin: 1.5em 1.5em 2em 0;
+    background-color: #CCCCCC;
+}
+
+
+/* The Modal (background) */
+
+.modal {
+    display: none;
+    /* Hidden by default */
+    position: fixed;
+    /* Stay in place */
+    z-index: 1;
+    /* Sit on top */
+    left: 0;
+    top: 0;
+    width: 100%;
+    /* Full width */
+    height: 100%;
+    /* Full height */
+    overflow: auto;
+    /* Enable scroll if needed */
+    background-color: rgb(0, 0, 0);
+    /* Fallback color */
+    background-color: rgba(0, 0, 0, 0.4);
+    /* Black w/ opacity */
+}
+
+
+/* Modal Content/Box */
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 20% auto;
+    /* 15% from the top and centered */
+    padding: 20px;
+    border: 1px solid #888;
+    width: 400px;
+    /* Could be more or less, depending on screen size */
+}
+
+
+/* The Close Button */
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.input-location>div>button {
+    display: block;
+    margin-top: 5%;
+}
+
+.table-header-rotated {
+    border-collapse: collapse;
+}
+
+.table-header-rotated th {
+    padding: 5px 10px;
+}
+
+.table-header-rotated td {
+    text-align: center;
+    /*padding: 10px 5px;*/
+    width: 20px;
+    border: 1px solid #ccc;
+}
+
+.table-header-rotated th span.rotate {
+    display: block;
+    height: 140px;
+    white-space: nowrap;
+    -webkit-transform: translate(40px, 105px) rotate(315deg);
+    -ms-transform: translate(40px, 105px) rotate(315deg);
+    transform: translate(40px, 105px) rotate(315deg);
+    width: 20px;
+}
+
+.table-header-rotated th.row-header {
+    padding: 0 10px;
+    border-bottom: 1px solid #ccc;
+}
+
+table.holidays>tbody>tr>td {
+    padding: 0 10px;
+}
+
+table#slacdt>tbody>tr>td {
+    padding: 5px;
+}
+
+td.vertafter {
+    border-right: 2px solid black;
+}
+
+.unclass-banner {
+    width: 100%;
+    background-color: #009900;
+}
+
+.home-section {
+    color: #fff;
+    background-color: #05053e;
+}
+
+.urania-logo-container {
+    border-color: transparent;
+    text-align: right;
+    overflow-y: hidden;
+}
+
+.urania-logo {
+    height: 5.5rem;
+    width: auto;
+    object-fit: cover;
+}
+
+@media (max-width:64em) {
+    .urania-logo {
+        height: 3rem;
+        width: auto;
+        object-fit: cover;
+    }
+}

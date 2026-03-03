@@ -319,3 +319,65 @@ def get_all_reserve_statuses() -> list[dict]:
         }
         for a in accounts
     ]
+
+
+# ── FULL MOON HARVEST SCHEDULER ──────────────────────────────────────────────
+
+
+async def full_moon_harvest_loop() -> None:
+    """
+    Background loop that checks for full moon transit and triggers harvest.
+
+    Traditional farming approach: profits compound in the pool until
+    the full moon, when they are harvested at the moon's peak (transit time).
+
+    Uses NASA/USNO data for precise transit timing - when the moon is at
+    its highest point in the sky, the fullest moment of the full moon.
+
+    Runs every 5 minutes to catch the transit window.
+    """
+    from db import trigger_full_moon_harvest, get_harvest_dashboard
+    from full_moon import is_full_moon_day, is_harvest_time, get_harvest_status
+
+    log.info("🌕 Full Moon Harvest scheduler started (using NASA transit data)")
+
+    while True:
+        try:
+            status = get_harvest_status()
+
+            if status["is_full_moon_day"]:
+                # Check if we're at the transit time (moon's peak)
+                if is_harvest_time(tolerance_minutes=30):
+                    transit = status.get("transit_time", "unknown")
+                    log.info(
+                        "🌕 Full moon at peak! Transit time: %s - Initiating harvest...",
+                        transit
+                    )
+                    result = trigger_full_moon_harvest()
+
+                    if result["harvested"] and result["total_harvested"] > 0:
+                        log.info(
+                            "🌾 Harvest complete at moon's zenith: $%.2f distributed",
+                            result["total_harvested"]
+                        )
+                else:
+                    transit = status.get("transit_time", "unknown")
+                    log.debug(
+                        "🌕 Full moon day - waiting for transit at %s PST",
+                        transit
+                    )
+            else:
+                # Log moon phase periodically
+                dashboard = get_harvest_dashboard()
+                if dashboard["days_until_harvest"] <= 3:
+                    log.info(
+                        "🌔 %s - $%.2f pending harvest",
+                        dashboard["moon_phase"],
+                        dashboard["pending_harvest"]["total"]
+                    )
+
+        except Exception as e:
+            log.error("Error in full moon harvest loop: %s", e)
+
+        # Check every 5 minutes to catch the transit window
+        await asyncio.sleep(300)
