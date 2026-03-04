@@ -276,3 +276,32 @@ def validate_polymarket_credentials(
         "missing": missing,
         "present": present,
     }
+
+
+def validate_kalshi_credentials(account_id: int) -> dict:
+    """
+    Check if all required Kalshi credentials are stored for an account.
+
+    Kalshi requires:
+    - api_key_id: The key ID from Kalshi
+    - private_key_pem: RSA private key in PEM format
+
+    Returns:
+        {
+            "complete": bool,
+            "missing": ["api_key_id", ...],
+            "present": ["private_key_pem", ...],
+        }
+    """
+    required = ["api_key_id", "private_key_pem"]
+    platform = "kalshi"
+
+    creds = get_account_credentials_summary(account_id)
+    present = [c["credential_type"] for c in creds if c["platform"] == platform]
+    missing = [r for r in required if r not in present]
+
+    return {
+        "complete": len(missing) == 0,
+        "missing": missing,
+        "present": present,
+    }

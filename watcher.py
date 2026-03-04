@@ -27,7 +27,13 @@ from typing import Optional
 
 import httpx
 
+import os
+import time
+
 from config import POLL_INTERVAL, POLYMARKET_DATA_API, get_active_wallets
+
+# Max age for 5-minute markets (seconds) - trades older than this are skipped
+FAST_MARKET_MAX_AGE = int(os.getenv("FAST_MARKET_MAX_AGE", "120"))  # 2 minutes
 from db import is_trade_processed, mark_trade_processed
 
 log = logging.getLogger(__name__)
@@ -139,6 +145,24 @@ async def _process_trade(wallet: str, trade: dict, queue: asyncio.Queue[TradeSig
         # ── Validate essential fields ──
         if not market_id or not token_id or side not in ("BUY", "SELL"):
             log.debug("Skipping invalid trade data: %s", trade)
+            return
+
+        # ── Staleness check for fast-expiring markets ──
+        # 5-minute Bitcoin markets expire quickly - skip if trade is too old
+        trade_age_seconds = time.time() - timestamp if timestamp > 0 else 0
+        is_fast_market = "Up or Down" in title or "5m" in title.lower()
+
+        if is_fast_market and trade_age_seconds > FAST_MARKET_MAX_AGE:
+            log.debug(
+                "Skipping stale 5-min market trade (%.0fs old): %s",
+                trade_age_seconds, title[:40]
+            )
+            # Still mark as processed to avoid re-checking
+            if tx_hash:
+                dedup_key = int(hashlib.sha256(tx_hash.encode()).hexdigest()[:8], 16)
+            else:
+                dedup_key = timestamp if timestamp > 0 else int(hashlib.sha256(str(sorted(trade.items())).encode()).hexdigest()[:8], 16)
+            mark_trade_processed(wallet, market_id, token_id, side, shares, dedup_key)
             return
 
         # ── Deduplication ──

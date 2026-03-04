@@ -34,7 +34,14 @@ def _get_client() -> ClobClient:
     if _client is not None:
         return _client
 
-    private_key = os.environ["POLY_PRIVATE_KEY"]
+    # Check both possible env var names
+    private_key = os.environ.get("POLY_PRIVATE_KEY") or os.environ.get("POLY_WALLET_PRIVATE_KEY")
+    if not private_key:
+        raise ValueError("POLY_PRIVATE_KEY not set - cannot initialize CLOB client")
+
+    # Ensure 0x prefix
+    if not private_key.startswith("0x"):
+        private_key = "0x" + private_key
 
     _client = ClobClient(
         host=CLOB_HOST,

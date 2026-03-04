@@ -60,6 +60,10 @@ cookies.txt
 b64_payload.txt
 nul
 
+# Kalshi credentials
+kalshi_private.pem
+*.pem
+
 # Claude Code
 .claude/settings.local.json
 

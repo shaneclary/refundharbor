@@ -292,3 +292,14 @@ STRATEGY_SWITCH_THRESHOLD = float(os.getenv("STRATEGY_SWITCH_THRESHOLD", "100000
 # strategy which mirrors trader allocation % rather than fixed dollar amounts.
 # At $100k+ with fixed tiers, you need high signal volume to stay deployed.
 # Proportional automatically sizes to the opportunity.
+
+# ── BTC 5-MIN DIVERGENCE STRATEGY ───────────────────────────────────────────
+# Autonomous strategy that trades BTC Up/Down 5-min markets when BTC momentum
+# diverges from Polymarket's implied probability.
+
+DIVERGENCE_ENABLED = os.getenv("DIVERGENCE_ENABLED", "true").lower() == "true"
+DIVERGENCE_MIN_EDGE = float(os.getenv("DIVERGENCE_MIN_EDGE", "0.05"))  # 5% min edge
+DIVERGENCE_OBS_SECONDS = int(os.getenv("DIVERGENCE_OBS_SECONDS", "30"))  # observe at T-Ns
+DIVERGENCE_BASE_SIZE = float(os.getenv("DIVERGENCE_BASE_SIZE", "10.0"))  # min Kelly size
+DIVERGENCE_MAX_SIZE = float(os.getenv("DIVERGENCE_MAX_SIZE", "30.0"))  # max Kelly size
+DIVERGENCE_STREAK_LIMIT = int(os.getenv("DIVERGENCE_STREAK_LIMIT", "3"))  # cooldown after N losses

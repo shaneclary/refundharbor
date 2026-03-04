@@ -350,18 +350,30 @@ async def main(mode: str) -> None:
         reserve_cycling_loop(),  # redistribute reserve to trading pool on schedule
         full_moon_harvest_loop(),  # harvest profits on the full moon (PST)
         settlement_loop(),  # settle allocated funds 3hrs before distribution
-        # Futures copy-trading (BTC-PERP from Hyperliquid)
-        start_futures_watchers(futures_queue),
-        process_futures_signals(futures_queue),
-        futures_pnl_update_loop(),  # update unrealized P&L every 30s
+        # Futures copy-trading disabled (Polymarket only)
+        # start_futures_watchers(futures_queue),
+        # process_futures_signals(futures_queue),
+        # futures_pnl_update_loop(),
     ]
+
+    # BTC 5-min divergence strategy (autonomous, not copy-trading)
+    from config import DIVERGENCE_ENABLED
+    if DIVERGENCE_ENABLED:
+        from divergence_watcher import divergence_loop
+        tasks.append(divergence_loop(mode))
+        log.info("BTC 5-min divergence strategy enabled")
 
     if USE_WEBSOCKET_PRICES:
         from ws_watcher import ws_price_feed
         tasks.append(ws_price_feed())
         log.info("WebSocket price feed enabled")
 
-    log.info("🔮 Futures copy-trading enabled (BTC-PERP from Hyperliquid)")
+    # On-chain monitoring for real-time 5-minute market detection
+    if os.getenv("POLYGON_WS_RPC"):
+        from onchain_watcher import start_onchain_watcher
+        tasks.append(start_onchain_watcher(queue))
+        log.info("⛓️ On-chain watcher enabled (real-time 5-min market detection)")
+
     await asyncio.gather(*tasks)
 
 

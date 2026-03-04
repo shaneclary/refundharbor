@@ -35,8 +35,135 @@ from db import (
     get_wallet_activity,
     get_wallet_exposure,
 )
+import mode as mode_module
 from portfolio import get_trader_portfolio
 from watcher import TradeSignal
+
+# Cache for CLOB balance to avoid spamming API
+_clob_balance_cache: dict = {"balance": None, "updated": 0}
+CLOB_BALANCE_CACHE_SECONDS = 30  # Refresh every 30 seconds
+
+
+def _get_clob_balance() -> float:
+    """
+    Fetch real USDC balance from Polymarket.
+
+    Uses on-chain RPC to check USDC balance directly - more reliable than
+    py_clob_client which can have authentication issues.
+
+    CRITICAL: This must return the REAL balance for guardrails to work.
+    If balance cannot be fetched, returns 0 to BLOCK all trades.
+    """
+    import os
+    import time
+
+    now = time.time()
+
+    # Return cached value if fresh
+    if _clob_balance_cache["balance"] is not None and now - _clob_balance_cache["updated"] < CLOB_BALANCE_CACHE_SECONDS:
+        return _clob_balance_cache["balance"]
+
+    try:
+        import httpx
+        from eth_account import Account
+
+        # Get private key and derive wallet address
+        private_key = os.environ.get("POLY_PRIVATE_KEY") or os.environ.get("POLY_WALLET_PRIVATE_KEY", "")
+        if not private_key:
+            log.error("POLY_PRIVATE_KEY not set - BLOCKING all trades until configured")
+            return 0.0
+
+        # Ensure 0x prefix
+        if not private_key.startswith("0x"):
+            private_key = "0x" + private_key
+
+        wallet_address = Account.from_key(private_key).address.lower()
+
+        # USDC contract on Polygon
+        usdc_contract = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+
+        # balanceOf(address) function selector + padded address
+        data = "0x70a08231" + wallet_address[2:].zfill(64)
+
+        payload = {
+            "jsonrpc": "2.0",
+            "method": "eth_call",
+            "params": [{"to": usdc_contract, "data": data}, "latest"],
+            "id": 1,
+        }
+
+        # Try multiple RPC endpoints
+        rpcs = [
+            "https://polygon.drpc.org",
+            "https://polygon-bor-rpc.publicnode.com",
+        ]
+
+        balance = 0.0
+        for rpc in rpcs:
+            try:
+                resp = httpx.post(rpc, json=payload, timeout=5.0)
+                result = resp.json()
+                if "result" in result and result["result"] != "0x":
+                    balance = int(result["result"], 16) / 1e6  # USDC has 6 decimals
+                    break
+            except Exception:
+                continue
+
+        # Also check Polymarket proxy wallet if available
+        proxy_wallet = os.getenv("POLY_WALLET_ADDRESS", "").lower()
+        if proxy_wallet and proxy_wallet.startswith("0x"):
+            data = "0x70a08231" + proxy_wallet[2:].zfill(64)
+            payload["params"] = [{"to": usdc_contract, "data": data}, "latest"]
+            for rpc in rpcs:
+                try:
+                    resp = httpx.post(rpc, json=payload, timeout=5.0)
+                    result = resp.json()
+                    if "result" in result and result["result"] != "0x":
+                        proxy_balance = int(result["result"], 16) / 1e6
+                        balance += proxy_balance
+                        break
+                except Exception:
+                    continue
+
+        _clob_balance_cache["balance"] = balance
+        _clob_balance_cache["updated"] = now
+
+        if balance > 0:
+            log.info("CLOB balance: $%.2f (used for guardrails)", balance)
+        return balance
+
+    except Exception as e:
+        log.warning("Error fetching CLOB balance: %s", e)
+
+    # Fallback to cached value or 0
+    return _clob_balance_cache["balance"] or 0.0
+
+
+def get_effective_balance(fund_id: str = "main") -> float:
+    """
+    Get the effective balance for trading.
+
+    In PAPER mode: returns the fund balance (simulated)
+    In GLOBAL/US mode: returns the REAL CLOB balance
+
+    CRITICAL: In live mode, this MUST return real balance for guardrails.
+    Returns 0 if balance cannot be fetched (blocks all trades as safety).
+    """
+    current_mode = mode_module.get_mode()
+
+    if current_mode == "paper":
+        return get_fund_balance(fund_id)
+    else:
+        # Live mode - MUST use real CLOB balance for guardrails
+        balance = _get_clob_balance()
+        if balance <= 0:
+            log.error(
+                "⚠️ CLOB balance is $0 or unavailable - ALL TRADES BLOCKED. "
+                "Check POLY_PRIVATE_KEY is set correctly."
+            )
+        else:
+            log.debug("Live mode balance: $%.2f", balance)
+        return balance
 
 log = logging.getLogger(__name__)
 
@@ -187,9 +314,9 @@ def _evaluate_buy(signal: TradeSignal, fund_id: str = "main", account_id: Option
         f_max_wallet_pct = profile.get("max_wallet_pct", MAX_WALLET_PCT)
         f_max_market_pct = profile.get("max_market_pct", MAX_MARKET_PCT)
     else:
-        # Legacy fund mode
+        # Legacy fund mode - use REAL balance in live mode, paper balance in paper mode
         fund_cfg = FUND_CONFIGS.get(fund_id, FUND_CONFIGS["main"])
-        balance = get_fund_balance(fund_id)
+        balance = get_effective_balance(fund_id)  # FIXED: Uses real CLOB balance in live mode
         strategy = fund_cfg.get("copy_strategy", COPY_STRATEGY)
         f_max_trade_pct = fund_cfg.get("max_trade_pct", MAX_TRADE_PCT)
         f_max_wallet_pct = fund_cfg.get("max_wallet_pct", MAX_WALLET_PCT)
