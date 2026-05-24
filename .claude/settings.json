@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(\"C:\\\\Users\\\\monik\\\\AppData\\\\Local\\\\Python\\\\bin\\\\python.exe\" web.py --port 8050)",
-      "Bash(powershell.exe -Command \"gh auth status\":*)"
-    ]
-  }
-}
