@@ -8,9 +8,9 @@ Plain HTML + one shared stylesheet. No build step. Deploys to Vercel as static f
 | File | Purpose |
 |------|---------|
 | `index.html` | Landing page: hero, opportunity stats, process, why-attorney-led, legal team, FAQ, eligibility intake form |
-| `disclosures.html` | Affiliate / not-a-law-firm / no-guarantee disclosures (**draft**) |
-| `privacy.html` | Privacy policy (**draft**) |
-| `terms.html` | Terms of use (**draft**) |
+| `disclosures.html` | Affiliate / not-a-law-firm / no-guarantee disclosures |
+| `privacy.html` | Privacy policy |
+| `terms.html` | Terms of use |
 | `styles.css` | Shared design tokens + all components |
 | `vercel.json` | Security + no-index response headers |
 | `robots.txt` | Blocks AI/training crawlers |
@@ -24,10 +24,10 @@ Plain HTML + one shared stylesheet. No build step. Deploys to Vercel as static f
    returns JSON). Submissions show inline success/error states without leaving
    the page; until configured, the form shows a "not configured" message.
 2. **Have counsel review the legal pages.** `disclosures.html`, `privacy.html`,
-   and `terms.html` are working drafts, each topped with a draft banner and
-   containing bracketed `[placeholders]` (legal entity name, address, governing
-   law, vendor names, retention periods, state-specific disclosures). They are
-   **not** final legal terms.
+   and `terms.html` still contain bracketed `[placeholders]` (legal entity name,
+   address, governing law, vendor names, retention periods, state-specific
+   disclosures). Have qualified counsel review and finalize them before relying
+   on them as binding legal terms.
 3. **Fill the dates.** Replace `[Month Day, 2026]` "last updated" dates on the
    legal pages.
 4. **Confirm the figures.** Statistics in the hero/stats/FAQ ($166B, 301,000+,
