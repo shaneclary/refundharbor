@@ -12,17 +12,20 @@ Plain HTML + one shared stylesheet. No build step. Deploys to Vercel as static f
 | `privacy.html` | Privacy policy |
 | `terms.html` | Terms of use |
 | `styles.css` | Shared design tokens + all components |
+| `form-handler.gs` | Google Apps Script that receives intake POSTs and appends them to a Sheet |
+| `FORM_SETUP.md` | Step-by-step to deploy the Apps Script and wire the form |
 | `vercel.json` | Security + no-index response headers |
 | `robots.txt` | Blocks AI/training crawlers |
 
 ## Before you deploy
 
-1. **Wire up the intake form.** In `index.html`, the form `#intake-form`
-   posts to `https://formspree.io/f/YOUR_FORM_ID`. Create a form at
-   [formspree.io](https://formspree.io) and replace `YOUR_FORM_ID` with your
-   real form ID (or swap the `action` for any endpoint that accepts a POST and
-   returns JSON). Submissions show inline success/error states without leaving
-   the page; until configured, the form shows a "not configured" message.
+1. **Wire up the intake form.** Leads are collected in a Google Sheet via a
+   Google Apps Script web app. Follow [FORM_SETUP.md](FORM_SETUP.md) (~10 min):
+   create a Sheet, paste [`form-handler.gs`](form-handler.gs), deploy it as a
+   web app, and put the resulting `/exec` URL in the `action` of `#intake-form`
+   in `index.html` (replacing `YOUR_DEPLOYMENT_ID`). Submissions append a row to
+   the Sheet and show inline success/error states without leaving the page;
+   until configured, the form shows a "not configured" message.
 2. **Have counsel review the legal pages.** `disclosures.html`, `privacy.html`,
    and `terms.html` still contain bracketed `[placeholders]` (legal entity name,
    address, governing law, vendor names, retention periods, state-specific
