@@ -2,24 +2,24 @@
   <title id="rhAltTitle">Refund Harbor — Tariff Recovery for U.S. Importers</title>
 
   <!--
-    Refund Harbor — "Mariner's Mark" alternative lockup.
+    Refund Harbor — "Mariner's Mark" alternative lockup, navy variant.
 
     Composition:
       LEFT  – circular emblem: outer ring + inner hairline, four diagonal
               compass ticks, a horizon line, a 4-point gold north star above
               the horizon, three gold bathymetric depth arcs below.
       RIGHT – REFUND / HARBOR stacked in serif Bold, hairline gold rule,
-              "TARIFF RECOVERY · FOR U.S. IMPORTERS" with flanking gold stars.
+              "TARIFF RECOVERY FOR U.S. IMPORTERS" with flanking gold stars.
 
-    Theming:
-      All "navy" elements use currentColor so the host page controls them.
-      Set color: #0a2540 on cream/white backgrounds, color: #f5f1e8 on the
-      dark navy backgrounds — same SVG renders correctly in both.
-      Gold (#b8956b) is hard-coded; it reads on both navy and cream.
+    Colors are hard-coded:
+      - Navy elements: #0a2540 — designed for cream / white / light backgrounds.
+      - Gold elements: #b8956b — reads on both light and dark.
+
+      For dark backgrounds use refundharbor.png (cream-on-dark PNG).
   -->
 
   <!-- ============================= MARK ============================= -->
-  <g transform="translate(10 10)" stroke="currentColor" fill="currentColor">
+  <g transform="translate(10 10)" stroke="#0a2540" fill="#0a2540">
     <!-- Outer ring -->
     <circle cx="90" cy="90" r="84" fill="none" stroke-width="2.4"/>
     <!-- Inner hairline ring -->
@@ -39,7 +39,7 @@
     <!-- North star — 4-point compass rose, gold -->
     <g transform="translate(90 56)" stroke="none">
       <path d="M 0 -34 L 4.5 -4.5 L 34 0 L 4.5 4.5 L 0 34 L -4.5 4.5 L -34 0 L -4.5 -4.5 Z" fill="#b8956b"/>
-      <circle r="2.2" fill="currentColor"/>
+      <circle r="2.2" fill="#0a2540"/>
     </g>
 
     <!-- Bathymetric arcs below horizon (depth contours), gold -->
@@ -57,14 +57,14 @@
           font-family="'Source Serif Pro', Georgia, 'Times New Roman', serif"
           font-size="62"
           font-weight="700"
-          fill="currentColor"
+          fill="#0a2540"
           letter-spacing="-1.5">REFUND</text>
     <!-- HARBOR -->
     <text x="0" y="124"
           font-family="'Source Serif Pro', Georgia, 'Times New Roman', serif"
           font-size="62"
           font-weight="700"
-          fill="currentColor"
+          fill="#0a2540"
           letter-spacing="-1.5">HARBOR</text>
 
     <!-- Hairline divider in gold -->
@@ -80,7 +80,7 @@
             font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif"
             font-size="11"
             font-weight="600"
-            fill="currentColor"
+            fill="#0a2540"
             letter-spacing="2.6">TARIFF RECOVERY FOR U.S. IMPORTERS</text>
       <!-- Right star -->
       <g transform="translate(316 -3)" fill="#b8956b">

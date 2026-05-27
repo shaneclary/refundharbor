@@ -181,23 +181,20 @@ em { color: var(--color-gold-light); font-style: italic; }
 }
 .header__brand-mark svg { width: 100%; height: 100%; display: block; }
 
-/* PNG brand lockup, sitting on a cream "stamp" so the navy logo
-   reads correctly against the dark navy header. */
+/* PNG brand lockup — the cream-on-navy logo sits bare on the dark
+   header. (Earlier the navy-on-cream PNG needed a cream "stamp"
+   pill background here; the new color-compliant PNG doesn't.) */
 .header__brand-logo {
   display: inline-flex;
   align-items: center;
-  background: var(--color-cream);
-  padding: 5px 12px;
-  border: 1px solid rgba(184, 149, 107, 0.22);
 }
 .header__brand-logo img {
-  height: 34px;
+  height: 40px;
   width: auto;
   display: block;
 }
 @media (max-width: 540px) {
-  .header__brand-logo { padding: 4px 10px; }
-  .header__brand-logo img { height: 28px; }
+  .header__brand-logo img { height: 32px; }
 }
 .header__nav {
   display: flex;
@@ -956,17 +953,14 @@ em { color: var(--color-gold-light); font-style: italic; }
 }
 .footer__brand-mark svg { width: 100%; height: 100%; display: block; }
 
-/* Footer variant of the cream brand stamp */
+/* Footer logo — bare on the dark navy, matching the header. */
 .footer__brand-logo {
   display: inline-flex;
   align-items: center;
-  background: var(--color-cream);
-  padding: 8px 16px;
-  border: 1px solid rgba(184, 149, 107, 0.25);
   margin-bottom: 18px;
 }
 .footer__brand-logo img {
-  height: 44px;
+  height: 52px;
   width: auto;
   display: block;
 }

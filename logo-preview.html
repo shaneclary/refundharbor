@@ -153,13 +153,15 @@
 <section class="section preview-page">
   <div class="container">
 
-    <h1>Logo design &mdash; comparison</h1>
-    <p class="lead">Current PNG vs. the new "Mariner's Mark" SVG alternative.</p>
+    <h1>Logo system &mdash; preview</h1>
+    <p class="lead">Two complementary variants, one for each color context.</p>
     <p class="note">
-      Each row is the same logo pair rendered at three sizes (large &middot; medium &middot; small)
-      on a different background context. The PNG is the design you have now; the SVG is the
-      proposed alternative, themed with <code style="font-size: 12px; background: var(--color-cream); padding: 1px 4px;">currentColor</code>
-      so the same file works on light and dark backgrounds.
+      <strong>refundharbor.png</strong> &mdash; cream-on-navy, designed for dark backgrounds
+      (header, footer, disclosure bar). <strong>refundharbor-alt.svg</strong> &mdash; navy-on-light,
+      "Mariner's Mark" variant designed for cream / white backgrounds (letter page, future
+      light sections). Each row below shows both at three sizes, on the background context
+      it&rsquo;s designed for &mdash; plus the mismatched pair, to make the why-two-variants
+      reasoning visible.
     </p>
 
     <!-- ON CREAM (matches site cream sections / letter page) -->
@@ -167,20 +169,26 @@
       <div class="preview-row__label">On cream background &middot; <span style="color: var(--color-text-muted); letter-spacing: 0.08em;">letter page, founder panel, "how it works"</span></div>
       <div class="preview-cols">
         <div class="preview-cell">
-          <h3>Current (PNG)</h3>
+          <h3>Wrong context &mdash; cream PNG won&rsquo;t read</h3>
           <div class="preview-stack">
             <div><div class="preview-size-label">100 px</div><div class="png-lg"><img src="refundharbor.png" alt="Refund Harbor"></div></div>
             <div><div class="preview-size-label">56 px (header)</div><div class="png-md"><img src="refundharbor.png" alt="Refund Harbor"></div></div>
             <div><div class="preview-size-label">32 px</div><div class="png-sm"><img src="refundharbor.png" alt="Refund Harbor"></div></div>
           </div>
+          <p style="font-size: 12.5px; color: var(--color-text-muted); margin: 18px 0 0; line-height: 1.6;">
+            The cream-on-dark PNG disappears against cream paper. Need the SVG variant here.
+          </p>
         </div>
         <div class="preview-cell">
-          <h3>Alternative (SVG)</h3>
+          <h3>Designed for this context &mdash; SVG (navy-on-light)</h3>
           <div class="preview-stack svg-cream">
             <div><div class="preview-size-label">100 px</div><div class="svg-lg"><img src="refundharbor-alt.svg" alt="Refund Harbor — alternative"></div></div>
-            <div><div class="preview-size-label">56 px (header)</div><div class="svg-md"><img src="refundharbor-alt.svg" alt="Refund Harbor — alternative"></div></div>
+            <div><div class="preview-size-label">56 px (letter page &mdash; production)</div><div class="svg-md"><img src="refundharbor-alt.svg" alt="Refund Harbor — alternative"></div></div>
             <div><div class="preview-size-label">32 px</div><div class="svg-sm"><img src="refundharbor-alt.svg" alt="Refund Harbor — alternative"></div></div>
           </div>
+          <p style="font-size: 12.5px; color: var(--color-text-muted); margin: 18px 0 0; line-height: 1.6;">
+            "Mariner's Mark" SVG &mdash; horizon line, gold north star, bathymetric arcs, serif wordmark.
+          </p>
         </div>
       </div>
     </div>
@@ -190,25 +198,25 @@
       <div class="preview-row__label">On dark navy background &middot; <span style="color: rgba(245,241,232,0.5); letter-spacing: 0.08em;">header, footer, hero, disclosure bar</span></div>
       <div class="preview-cols">
         <div class="preview-cell">
-          <h3>Current (PNG, needs cream stamp)</h3>
+          <h3>Designed for this context &mdash; PNG (cream-on-navy)</h3>
           <div class="preview-stack">
-            <div><div class="preview-size-label">100 px (in stamp)</div><div class="png-lg"><div class="png-stamp"><img src="refundharbor.png" alt="Refund Harbor"></div></div></div>
-            <div><div class="preview-size-label">56 px (header — current production)</div><div class="png-md"><div class="png-stamp"><img src="refundharbor.png" alt="Refund Harbor"></div></div></div>
-            <div><div class="preview-size-label">32 px (in stamp)</div><div class="png-sm"><div class="png-stamp"><img src="refundharbor.png" alt="Refund Harbor"></div></div></div>
+            <div><div class="preview-size-label">100 px</div><div class="png-lg"><img src="refundharbor.png" alt="Refund Harbor"></div></div>
+            <div><div class="preview-size-label">56 px (header — production)</div><div class="png-md"><img src="refundharbor.png" alt="Refund Harbor"></div></div>
+            <div><div class="preview-size-label">32 px</div><div class="png-sm"><img src="refundharbor.png" alt="Refund Harbor"></div></div>
           </div>
           <p style="font-size: 12.5px; color: rgba(245,241,232,0.55); margin: 18px 0 0; line-height: 1.6;">
-            Note: the navy elements of the PNG can&rsquo;t read on the navy background &mdash; we add the cream &ldquo;stamp&rdquo; pill on the live site to give it the contrast it needs.
+            New color-compliant PNG. Sits bare on the dark navy &mdash; no cream &ldquo;stamp&rdquo; needed.
           </p>
         </div>
         <div class="preview-cell">
-          <h3>Alternative (SVG, bare on navy)</h3>
-          <div class="preview-stack svg-navy">
+          <h3>Wrong context &mdash; navy SVG won&rsquo;t read</h3>
+          <div class="preview-stack">
             <div><div class="preview-size-label">100 px</div><div class="svg-lg"><img src="refundharbor-alt.svg" alt="Refund Harbor — alternative"></div></div>
             <div><div class="preview-size-label">56 px (header)</div><div class="svg-md"><img src="refundharbor-alt.svg" alt="Refund Harbor — alternative"></div></div>
             <div><div class="preview-size-label">32 px</div><div class="svg-sm"><img src="refundharbor-alt.svg" alt="Refund Harbor — alternative"></div></div>
           </div>
           <p style="font-size: 12.5px; color: rgba(245,241,232,0.55); margin: 18px 0 0; line-height: 1.6;">
-            Bare on the dark navy. The currentColor trick recolors the navy elements to cream automatically &mdash; no stamp needed, and the gold elements still read.
+            Why two variants: navy on navy is invisible. The SVG is for light contexts only.
           </p>
         </div>
       </div>
@@ -239,30 +247,35 @@
 
     <!-- Design notes -->
     <div class="preview-notes">
-      <h2>What's different about the alternative</h2>
-      <ul>
-        <li><strong>Composition.</strong> Replaces the boat with a <em>horizon line</em>, a four-point <em>gold north star</em> above, and three <em>bathymetric depth arcs</em> below. Same harbor metaphor, less literal.</li>
-        <li><strong>Type.</strong> Wordmark in <em>Source Serif Pro Bold</em> instead of bold sans &mdash; pairs with the site's existing serif headlines, reads more institutional.</li>
-        <li><strong>Tagline lockup.</strong> Two small gold stars flank the tagline with a hairline gold rule separating it from the wordmark &mdash; same family as the current decoration, slightly more refined.</li>
-        <li><strong>Bi-modal coloring.</strong> Navy elements use <code style="font-size: 12px;">currentColor</code>. Set <code style="font-size: 12px;">color: cream</code> on dark backgrounds, <code style="font-size: 12px;">color: navy</code> on light. One file works everywhere &mdash; no cream stamp pill required on the navy header.</li>
-        <li><strong>Format.</strong> SVG instead of PNG. Crisp at every size including retina and print. ~2 KB file size. Themeable with CSS.</li>
-      </ul>
-
-      <h2 style="margin-top: 28px;">What stayed the same</h2>
-      <ul>
-        <li>Navy + muted gold palette.</li>
-        <li>Circular mark, with diagonal compass tick marks at the corners.</li>
-        <li>"REFUND / HARBOR" stacked in all caps, with the same overall horizontal lockup proportion as the current.</li>
-        <li>The tagline "TARIFF RECOVERY FOR U.S. IMPORTERS" with gold accent stars.</li>
-      </ul>
-
-      <h2 style="margin-top: 28px;">If you want to ship this</h2>
+      <h2>The two-variant system, in plain language</h2>
       <p>
-        Say the word and I&rsquo;ll swap <code style="font-size: 12.5px;">refundharbor.png</code> &rarr;
-        <code style="font-size: 12.5px;">refundharbor-alt.svg</code> in every header, footer, and the letter
-        page, drop the cream stamp pill from the header/footer styles (no longer needed), and ship.
-        Or, if you want to keep this as a backup and stay with the current PNG, no harm done &mdash; both
-        live in the repo.
+        Each variant is designed for the background it shows up on. Putting either one on the
+        wrong background fails &mdash; that&rsquo;s by design, not a bug.
+      </p>
+      <ul>
+        <li><strong>refundharbor.png</strong> &mdash; cream/light elements on a transparent ground.
+          Lives on the dark navy <strong>header</strong>, <strong>footer</strong>, and
+          <strong>disclosure bar</strong>. Bare, no stamp pill.</li>
+        <li><strong>refundharbor-alt.svg</strong> &mdash; navy elements on a transparent ground.
+          Lives on the cream paper of the <strong>letter page</strong>, and on any future
+          light/cream/white section. The "Mariner's Mark" composition: outer ring, horizon line,
+          four-point gold north star, three gold bathymetric depth arcs, serif wordmark, hairline
+          gold rule, tagline with gold stars.</li>
+      </ul>
+
+      <h2 style="margin-top: 28px;">Production routing</h2>
+      <ul>
+        <li><strong>index.html</strong>, <strong>disclosures.html</strong>, <strong>privacy.html</strong>, <strong>terms.html</strong>, <strong>insights/*</strong> &mdash; header and footer use the PNG (dark navy).</li>
+        <li><strong>letter.html</strong> &mdash; header/footer use the PNG; the letter-paper head uses the SVG (cream paper).</li>
+        <li><strong>favicon</strong> &mdash; <code style="font-size: 12.5px;">favicon.svg</code> (the small compass mark) stays. PNGs lose crispness at 16/32 px.</li>
+      </ul>
+
+      <h2 style="margin-top: 28px;">If a future section needs the other variant</h2>
+      <p>
+        Adding a navy section on the homepage where the dark logo wouldn&rsquo;t read? Use
+        the PNG. Adding a white-background panel where the cream logo wouldn&rsquo;t read?
+        Use the SVG. The pattern is: pick the variant designed for the background, not the
+        one you used last time.
       </p>
     </div>
 
