@@ -1,6 +1,6 @@
 /**
- * DenseWealth — eligibility intake handler (Google Apps Script)
- * =============================================================
+ * Refund Harbor — eligibility intake handler (Google Apps Script)
+ * ===============================================================
  * Receives POSTs from the intake form in index.html and appends each
  * submission as a row in this Spreadsheet. Returns JSON so the page can
  * show inline success/error states.
@@ -60,7 +60,7 @@ function doPost(e) {
 
 // Lets you open the /exec URL in a browser to confirm the deployment is live.
 function doGet() {
-  return json({ result: 'ok', message: 'DenseWealth intake endpoint is live.' });
+  return json({ result: 'ok', message: 'Refund Harbor intake endpoint is live.' });
 }
 
 function getSheet_() {

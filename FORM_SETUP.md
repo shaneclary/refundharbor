@@ -6,7 +6,7 @@ no server, no monthly cost. About 10 minutes, once.
 ## 1. Create the Sheet
 
 1. Go to [sheets.google.com](https://sheets.google.com) and create a blank Sheet
-   (e.g. **DenseWealth — Intakes**). Put it in a Drive owned by your business
+   (e.g. **Refund Harbor — Intakes**). Put it in a Drive owned by your business
    account, not a personal one.
 2. You don't need to add headers — the script creates them on the first
    submission.
