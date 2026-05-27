@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logo design — comparison</title>
+<meta name="description" content="Internal comparison: current Refund Harbor PNG logo vs. the Mariner's Mark SVG alternative, at multiple sizes and on multiple backgrounds.">
+<meta name="robots" content="noindex, noarchive, nosnippet">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+Pro:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap">
+<link rel="stylesheet" href="styles.css">
+<style>
+  /* Preview-page-only layout */
+  .preview-page { padding: 64px 0 96px; }
+  .preview-page h1 {
+    font-size: 38px;
+    color: var(--color-navy);
+    margin: 0 0 12px;
+  }
+  .preview-page .lead {
+    font-size: 18px;
+    color: var(--color-text-secondary);
+    margin: 0 0 8px;
+    font-style: italic;
+  }
+  .preview-page .note {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    margin: 0 0 40px;
+    max-width: 720px;
+  }
+
+  .preview-row {
+    margin: 40px 0;
+    padding: 40px;
+    border: 1px solid var(--color-rule);
+  }
+  .preview-row--cream { background: var(--color-cream); color: var(--color-navy); }
+  .preview-row--navy  { background: var(--color-navy-deep); color: var(--color-cream); }
+  .preview-row--white { background: #ffffff; color: var(--color-navy); }
+
+  .preview-row__label {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-gold);
+    margin-bottom: 24px;
+  }
+  .preview-row--navy .preview-row__label { color: var(--color-gold-light); }
+
+  .preview-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    align-items: start;
+  }
+  @media (max-width: 720px) {
+    .preview-cols { grid-template-columns: 1fr; gap: 32px; }
+  }
+
+  .preview-cell h3 {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin: 0 0 16px;
+    color: inherit;
+    opacity: 0.7;
+  }
+  .preview-row--navy .preview-cell h3 { color: var(--color-gold-light); opacity: 1; }
+
+  .preview-stack { display: flex; flex-direction: column; gap: 28px; }
+  .preview-size-label {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    margin: 0 0 8px;
+  }
+  .preview-row--navy .preview-size-label { color: rgba(245, 241, 232, 0.5); }
+
+  /* PNG sizes */
+  .png-lg img { height: 100px; width: auto; display: block; }
+  .png-md img { height: 56px;  width: auto; display: block; }
+  .png-sm img { height: 32px;  width: auto; display: block; }
+
+  /* SVG sizes (use inline svg or <img src=".svg">) */
+  .svg-lg svg, .svg-lg img { height: 100px; width: auto; display: block; }
+  .svg-md svg, .svg-md img { height: 56px;  width: auto; display: block; }
+  .svg-sm svg, .svg-sm img { height: 32px;  width: auto; display: block; }
+
+  /* The currentColor SVG container: set color per background context */
+  .svg-cream { color: #0a2540; }
+  .svg-navy  { color: #f5f1e8; }
+  .svg-white { color: #0a2540; }
+
+  /* PNG-on-dark fallback: cream stamp pill (so the navy PNG reads) */
+  .png-stamp {
+    display: inline-flex;
+    background: var(--color-cream);
+    padding: 8px 16px;
+    border: 1px solid rgba(184, 149, 107, 0.25);
+  }
+
+  .preview-notes {
+    margin-top: 40px;
+    padding: 28px 32px;
+    background: var(--color-bg-section);
+    border-left: 3px solid var(--color-gold);
+  }
+  .preview-notes h2 {
+    font-size: 22px;
+    color: var(--color-navy);
+    margin: 0 0 14px;
+  }
+  .preview-notes p {
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--color-text-secondary);
+    margin: 0 0 0.85em;
+  }
+  .preview-notes p:last-child { margin-bottom: 0; }
+  .preview-notes ul {
+    margin: 0 0 0.85em;
+    padding-left: 20px;
+    color: var(--color-text-secondary);
+    font-size: 15px;
+    line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="container header__inner">
+    <a href="index.html" class="header__brand" aria-label="Refund Harbor — home">
+      <span class="header__brand-logo">
+        <img src="refundharbor.png" alt="Refund Harbor — Tariff Recovery for U.S. Importers">
+      </span>
+    </a>
+    <nav class="header__nav">
+      <a href="index.html" class="header__link">Back to site</a>
+    </nav>
+  </div>
+</header>
+
+<section class="section preview-page">
+  <div class="container">
+
+    <h1>Logo design &mdash; comparison</h1>
+    <p class="lead">Current PNG vs. the new "Mariner's Mark" SVG alternative.</p>
+    <p class="note">
+      Each row is the same logo pair rendered at three sizes (large &middot; medium &middot; small)
+      on a different background context. The PNG is the design you have now; the SVG is the
+      proposed alternative, themed with <code style="font-size: 12px; background: var(--color-cream); padding: 1px 4px;">currentColor</code>
+      so the same file works on light and dark backgrounds.
+    </p>
+
+    <!-- ON CREAM (matches site cream sections / letter page) -->
+    <div class="preview-row preview-row--cream">
+      <div class="preview-row__label">On cream background &middot; <span style="color: var(--color-text-muted); letter-spacing: 0.08em;">letter page, founder panel, "how it works"</span></div>
+      <div class="preview-cols">
+        <div class="preview-cell">
+          <h3>Current (PNG)</h3>
+          <div class="preview-stack">
+            <div><div class="preview-size-label">100 px</div><div class="png-lg"><img src="refundharbor.png" alt="Refund Harbor"></div></div>
+            <div><div class="preview-size-label">56 px (header)</div><div class="png-md"><img src="refundharbor.png" alt="Refund Harbor"></div></div>
+            <div><div class="preview-size-label">32 px</div><div class="png-sm"><img src="refundharbor.png" alt="Refund Harbor"></div></div>
+          </div>
+        </div>
+        <div class="preview-cell">
+          <h3>Alternative (SVG)</h3>
+          <div class="preview-stack svg-cream">
+            <div><div class="preview-size-label">100 px</div><div class="svg-lg"><img src="refundharbor-alt.svg" alt="Refund Harbor — alternative"></div></div>
+            <div><div class="preview-size-label">56 px (header)</div><div class="svg-md"><img src="refundharbor-alt.svg" alt="Refund Harbor — alternative"></div></div>
+            <div><div class="preview-size-label">32 px</div><div class="svg-sm"><img src="refundharbor-alt.svg" alt="Refund Harbor — alternative"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ON DARK NAVY (matches actual header / footer / disclosure bar) -->
+    <div class="preview-row preview-row--navy">
+      <div class="preview-row__label">On dark navy background &middot; <span style="color: rgba(245,241,232,0.5); letter-spacing: 0.08em;">header, footer, hero, disclosure bar</span></div>
+      <div class="preview-cols">
+        <div class="preview-cell">
+          <h3>Current (PNG, needs cream stamp)</h3>
+          <div class="preview-stack">
+            <div><div class="preview-size-label">100 px (in stamp)</div><div class="png-lg"><div class="png-stamp"><img src="refundharbor.png" alt="Refund Harbor"></div></div></div>
+            <div><div class="preview-size-label">56 px (header — current production)</div><div class="png-md"><div class="png-stamp"><img src="refundharbor.png" alt="Refund Harbor"></div></div></div>
+            <div><div class="preview-size-label">32 px (in stamp)</div><div class="png-sm"><div class="png-stamp"><img src="refundharbor.png" alt="Refund Harbor"></div></div></div>
+          </div>
+          <p style="font-size: 12.5px; color: rgba(245,241,232,0.55); margin: 18px 0 0; line-height: 1.6;">
+            Note: the navy elements of the PNG can&rsquo;t read on the navy background &mdash; we add the cream &ldquo;stamp&rdquo; pill on the live site to give it the contrast it needs.
+          </p>
+        </div>
+        <div class="preview-cell">
+          <h3>Alternative (SVG, bare on navy)</h3>
+          <div class="preview-stack svg-navy">
+            <div><div class="preview-size-label">100 px</div><div class="svg-lg"><img src="refundharbor-alt.svg" alt="Refund Harbor — alternative"></div></div>
+            <div><div class="preview-size-label">56 px (header)</div><div class="svg-md"><img src="refundharbor-alt.svg" alt="Refund Harbor — alternative"></div></div>
+            <div><div class="preview-size-label">32 px</div><div class="svg-sm"><img src="refundharbor-alt.svg" alt="Refund Harbor — alternative"></div></div>
+          </div>
+          <p style="font-size: 12.5px; color: rgba(245,241,232,0.55); margin: 18px 0 0; line-height: 1.6;">
+            Bare on the dark navy. The currentColor trick recolors the navy elements to cream automatically &mdash; no stamp needed, and the gold elements still read.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ON WHITE (matches default content sections / form card / insight cards) -->
+    <div class="preview-row preview-row--white">
+      <div class="preview-row__label">On white background &middot; <span style="color: var(--color-text-muted); letter-spacing: 0.08em;">default content sections, form card</span></div>
+      <div class="preview-cols">
+        <div class="preview-cell">
+          <h3>Current (PNG)</h3>
+          <div class="preview-stack">
+            <div><div class="preview-size-label">100 px</div><div class="png-lg"><img src="refundharbor.png" alt="Refund Harbor"></div></div>
+            <div><div class="preview-size-label">56 px</div><div class="png-md"><img src="refundharbor.png" alt="Refund Harbor"></div></div>
+            <div><div class="preview-size-label">32 px</div><div class="png-sm"><img src="refundharbor.png" alt="Refund Harbor"></div></div>
+          </div>
+        </div>
+        <div class="preview-cell">
+          <h3>Alternative (SVG)</h3>
+          <div class="preview-stack svg-white">
+            <div><div class="preview-size-label">100 px</div><div class="svg-lg"><img src="refundharbor-alt.svg" alt="Refund Harbor — alternative"></div></div>
+            <div><div class="preview-size-label">56 px</div><div class="svg-md"><img src="refundharbor-alt.svg" alt="Refund Harbor — alternative"></div></div>
+            <div><div class="preview-size-label">32 px</div><div class="svg-sm"><img src="refundharbor-alt.svg" alt="Refund Harbor — alternative"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Design notes -->
+    <div class="preview-notes">
+      <h2>What's different about the alternative</h2>
+      <ul>
+        <li><strong>Composition.</strong> Replaces the boat with a <em>horizon line</em>, a four-point <em>gold north star</em> above, and three <em>bathymetric depth arcs</em> below. Same harbor metaphor, less literal.</li>
+        <li><strong>Type.</strong> Wordmark in <em>Source Serif Pro Bold</em> instead of bold sans &mdash; pairs with the site's existing serif headlines, reads more institutional.</li>
+        <li><strong>Tagline lockup.</strong> Two small gold stars flank the tagline with a hairline gold rule separating it from the wordmark &mdash; same family as the current decoration, slightly more refined.</li>
+        <li><strong>Bi-modal coloring.</strong> Navy elements use <code style="font-size: 12px;">currentColor</code>. Set <code style="font-size: 12px;">color: cream</code> on dark backgrounds, <code style="font-size: 12px;">color: navy</code> on light. One file works everywhere &mdash; no cream stamp pill required on the navy header.</li>
+        <li><strong>Format.</strong> SVG instead of PNG. Crisp at every size including retina and print. ~2 KB file size. Themeable with CSS.</li>
+      </ul>
+
+      <h2 style="margin-top: 28px;">What stayed the same</h2>
+      <ul>
+        <li>Navy + muted gold palette.</li>
+        <li>Circular mark, with diagonal compass tick marks at the corners.</li>
+        <li>"REFUND / HARBOR" stacked in all caps, with the same overall horizontal lockup proportion as the current.</li>
+        <li>The tagline "TARIFF RECOVERY FOR U.S. IMPORTERS" with gold accent stars.</li>
+      </ul>
+
+      <h2 style="margin-top: 28px;">If you want to ship this</h2>
+      <p>
+        Say the word and I&rsquo;ll swap <code style="font-size: 12.5px;">refundharbor.png</code> &rarr;
+        <code style="font-size: 12.5px;">refundharbor-alt.svg</code> in every header, footer, and the letter
+        page, drop the cream stamp pill from the header/footer styles (no longer needed), and ship.
+        Or, if you want to keep this as a backup and stay with the current PNG, no harm done &mdash; both
+        live in the repo.
+      </p>
+    </div>
+
+  </div>
+</section>
+
+</body>
+</html>
