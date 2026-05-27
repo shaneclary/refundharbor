@@ -445,11 +445,128 @@
     <span class="eyebrow">Begin</span>
     <h2>Find out what your business <em>may be owed.</em></h2>
     <p class="subhead">
-      The eligibility review is free. Specialist trade counsel confirms in writing
-      within 1&ndash;2 weeks. No upfront fee to begin.
+      A 90-second eligibility check, then your details.
     </p>
 
-    <div class="intake">
+    <!-- QUALIFIER WIZARD -->
+    <div class="qualifier" id="qualifier">
+      <div class="qualifier__header">
+        <div class="qualifier__status" id="qualifier-status" data-status="pending" aria-live="polite">
+          <span class="qualifier__status-mark" aria-hidden="true">
+            <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><g fill="currentColor" stroke="currentColor"><circle cx="20" cy="20" r="17" fill="none" stroke-width="0.75" opacity="0.5"/><circle cx="20" cy="20" r="13.5" fill="none" stroke-width="0.5" opacity="0.3"/><path d="M20 3 L21.5 18.5 L37 20 L21.5 21.5 L20 37 L18.5 21.5 L3 20 L18.5 18.5 Z" stroke="none"/><line x1="9" y1="9" x2="13" y2="13" stroke-width="0.85" opacity="0.55"/><line x1="31" y1="9" x2="27" y2="13" stroke-width="0.85" opacity="0.55"/><line x1="31" y1="31" x2="27" y2="27" stroke-width="0.85" opacity="0.55"/><line x1="9" y1="31" x2="13" y2="27" stroke-width="0.85" opacity="0.55"/><circle cx="20" cy="20" r="0.9" stroke="none"/></g></svg>
+          </span>
+          <span class="qualifier__status-label" id="qualifier-status-label">Not yet eligible</span>
+        </div>
+        <div class="qualifier__progress" id="qualifier-progress" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+
+      <!-- Step: Intro -->
+      <div class="qualifier__step is-active" data-step="intro">
+        <div class="qualifier__step-meta">Eligibility check</div>
+        <h3 class="qualifier__step-title">Seven quick questions.</h3>
+        <p class="qualifier__step-body">No documents, no commitment &mdash; about 90 seconds. These establish whether the program is a fit before we collect any details.</p>
+        <button type="button" class="btn btn--primary btn--lg" data-action="start">
+          Start the check <span class="btn__arrow">&rarr;</span>
+        </button>
+      </div>
+
+      <!-- Q1 -->
+      <div class="qualifier__step" data-step="1">
+        <div class="qualifier__step-meta">Question 1 of 7</div>
+        <h3 class="qualifier__step-title">Is your business based in the United States, with imports entered in 2025?</h3>
+        <div class="qualifier__options">
+          <button type="button" class="qualifier__option" data-q="1" data-answer="yes">Yes</button>
+          <button type="button" class="qualifier__option" data-q="1" data-answer="no">No</button>
+          <button type="button" class="qualifier__option" data-q="1" data-answer="not-sure">Not sure</button>
+        </div>
+        <button type="button" class="qualifier__back" data-action="back">&larr; Back</button>
+      </div>
+
+      <!-- Q2 -->
+      <div class="qualifier__step" data-step="2">
+        <div class="qualifier__step-meta">Question 2 of 7</div>
+        <h3 class="qualifier__step-title">Were you the importer of record on those entries &mdash; the party named on CBP Form 7501?</h3>
+        <div class="qualifier__options">
+          <button type="button" class="qualifier__option" data-q="2" data-answer="yes">Yes</button>
+          <button type="button" class="qualifier__option" data-q="2" data-answer="no">No, a third party was</button>
+          <button type="button" class="qualifier__option" data-q="2" data-answer="not-sure">Not sure</button>
+        </div>
+        <button type="button" class="qualifier__back" data-action="back">&larr; Back</button>
+      </div>
+
+      <!-- Q3 -->
+      <div class="qualifier__step" data-step="3">
+        <div class="qualifier__step-meta">Question 3 of 7</div>
+        <h3 class="qualifier__step-title">Did your business pay U.S. customs duties or tariffs on those imports?</h3>
+        <div class="qualifier__options">
+          <button type="button" class="qualifier__option" data-q="3" data-answer="yes">Yes</button>
+          <button type="button" class="qualifier__option" data-q="3" data-answer="no">No</button>
+          <button type="button" class="qualifier__option" data-q="3" data-answer="not-sure">Not sure</button>
+        </div>
+        <button type="button" class="qualifier__back" data-action="back">&larr; Back</button>
+      </div>
+
+      <!-- Q4 -->
+      <div class="qualifier__step" data-step="4">
+        <div class="qualifier__step-meta">Question 4 of 7</div>
+        <h3 class="qualifier__step-title">Were the goods from countries subject to IEEPA tariffs &mdash; most notably China, after February 2025?</h3>
+        <div class="qualifier__options">
+          <button type="button" class="qualifier__option" data-q="4" data-answer="mostly">Mostly yes</button>
+          <button type="button" class="qualifier__option" data-q="4" data-answer="some">Some were</button>
+          <button type="button" class="qualifier__option" data-q="4" data-answer="none">None</button>
+          <button type="button" class="qualifier__option" data-q="4" data-answer="not-sure">Not sure</button>
+        </div>
+        <button type="button" class="qualifier__back" data-action="back">&larr; Back</button>
+      </div>
+
+      <!-- Q5 (threshold) -->
+      <div class="qualifier__step" data-step="5">
+        <div class="qualifier__step-meta">Question 5 of 7</div>
+        <h3 class="qualifier__step-title">Roughly how much did your business pay in 2025 customs duties total?</h3>
+        <div class="qualifier__options">
+          <button type="button" class="qualifier__option" data-q="5" data-answer="under-25k">Under $25,000</button>
+          <button type="button" class="qualifier__option" data-q="5" data-answer="25k-100k">$25,000 &ndash; $100,000</button>
+          <button type="button" class="qualifier__option" data-q="5" data-answer="100k-500k">$100,000 &ndash; $500,000</button>
+          <button type="button" class="qualifier__option" data-q="5" data-answer="over-500k">Over $500,000</button>
+          <button type="button" class="qualifier__option" data-q="5" data-answer="not-sure">Not sure</button>
+        </div>
+        <button type="button" class="qualifier__back" data-action="back">&larr; Back</button>
+      </div>
+
+      <!-- Q6 -->
+      <div class="qualifier__step" data-step="6">
+        <div class="qualifier__step-meta">Question 6 of 7</div>
+        <h3 class="qualifier__step-title">Have you, or anyone on your behalf, already filed a customs protest (&sect; 1514) on these same entries?</h3>
+        <div class="qualifier__options">
+          <button type="button" class="qualifier__option" data-q="6" data-answer="no">No</button>
+          <button type="button" class="qualifier__option" data-q="6" data-answer="yes">Yes</button>
+          <button type="button" class="qualifier__option" data-q="6" data-answer="not-sure">Not sure</button>
+        </div>
+        <button type="button" class="qualifier__back" data-action="back">&larr; Back</button>
+      </div>
+
+      <!-- Q7 -->
+      <div class="qualifier__step" data-step="7">
+        <div class="qualifier__step-meta">Question 7 of 7</div>
+        <h3 class="qualifier__step-title">Can you provide entry summaries (CBP Form 7501) &mdash; directly, through your broker, or via your ACE account?</h3>
+        <div class="qualifier__options">
+          <button type="button" class="qualifier__option" data-q="7" data-answer="yes">Yes</button>
+          <button type="button" class="qualifier__option" data-q="7" data-answer="help">We&rsquo;d need help getting them</button>
+          <button type="button" class="qualifier__option" data-q="7" data-answer="no">No</button>
+        </div>
+        <button type="button" class="qualifier__back" data-action="back">&larr; Back</button>
+      </div>
+
+      <!-- Result -->
+      <div class="qualifier__step" data-step="result">
+        <div class="qualifier__result" id="qualifier-result"><!-- populated by JS --></div>
+        <button type="button" class="qualifier__back" data-action="restart">&#8634; Edit answers</button>
+      </div>
+    </div>
+
+    <div class="intake" id="intake-wrapper" hidden>
       <aside>
         <div class="intake__aside-title">What happens after you submit</div>
         <ul class="intake__points">
@@ -634,6 +751,185 @@
 </footer>
 
 <script>
+  /* =========================================================
+     Eligibility qualifier — 7-question state machine
+     ---------------------------------------------------------
+     - State lives in `answers` (q1..q7) and `currentStep`.
+     - Click delegation off the qualifier root; one handler.
+     - Permissive: "not sure" never disqualifies.
+     - Threshold for "below program threshold" is total 2025
+       duties under $25k (Q5 === "under-25k"). Adjust THRESHOLD
+       below if the program economics change.
+     ========================================================= */
+  (function () {
+    var qualifier = document.getElementById('qualifier');
+    if (!qualifier) return;
+
+    var statusEl = document.getElementById('qualifier-status');
+    var statusLabel = document.getElementById('qualifier-status-label');
+    var progressEl = document.getElementById('qualifier-progress');
+    var resultEl = document.getElementById('qualifier-result');
+    var intakeWrapper = document.getElementById('intake-wrapper');
+
+    var STATUS_LABELS = {
+      'pending': 'Not yet eligible',
+      'disqualified': 'Not eligible for this program',
+      'below-threshold': 'Eligible — below program threshold',
+      'qualified': 'Eligible for full review'
+    };
+    var THRESHOLD_ANSWER = 'under-25k'; // Q5 answer that drops to below-threshold
+
+    var answers = {};
+    var currentStep = 'intro';
+
+    function setStep(step) {
+      var steps = qualifier.querySelectorAll('.qualifier__step');
+      for (var i = 0; i < steps.length; i++) {
+        steps[i].classList.toggle('is-active', steps[i].dataset.step === String(step));
+      }
+      currentStep = String(step);
+    }
+
+    function setStatus(status) {
+      statusEl.dataset.status = status;
+      statusLabel.textContent = STATUS_LABELS[status];
+    }
+
+    function updateProgress() {
+      var dots = progressEl.querySelectorAll('span');
+      var answered = Object.keys(answers).length;
+      for (var i = 0; i < dots.length; i++) {
+        dots[i].classList.toggle('is-filled', i < answered);
+      }
+    }
+
+    function computeOutcome() {
+      var q1 = answers.q1, q3 = answers.q3, q4 = answers.q4,
+          q5 = answers.q5, q6 = answers.q6, q7 = answers.q7;
+      if (q1 === 'no')   return { status: 'disqualified', reason: 'Our program is currently limited to U.S. businesses with imports entered in 2025.' };
+      if (q3 === 'no')   return { status: 'disqualified', reason: 'Refund recovery requires that your business actually paid customs duties on the imports.' };
+      if (q4 === 'none') return { status: 'disqualified', reason: 'Our program targets IEEPA-related tariffs. If your imports weren’t from countries affected by IEEPA orders, there’s no IEEPA-tariff refund to pursue through this program.' };
+      if (q6 === 'yes')  return { status: 'disqualified', reason: 'A protest under § 1514 has already been filed on these entries. Continuing with whoever filed it avoids procedural conflicts.' };
+      if (q7 === 'no')   return { status: 'disqualified', reason: 'Refund filings require entry summaries (CBP Form 7501). Without access — directly or through a customs broker — the program can’t proceed.' };
+      if (q5 === THRESHOLD_ANSWER) return { status: 'below-threshold' };
+      return { status: 'qualified' };
+    }
+
+    function escapeHTML(s) {
+      return String(s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+
+    function renderResult() {
+      var outcome = computeOutcome();
+      setStatus(outcome.status);
+
+      if (outcome.status === 'qualified') {
+        resultEl.className = 'qualifier__result qualifier__result--qualified';
+        resultEl.innerHTML =
+          '<h3 class="qualifier__result-headline">Looks like a fit.</h3>' +
+          '<p class="qualifier__result-body">' +
+            'Based on your answers, your business appears to qualify for the program. The next step is a free eligibility review by trade counsel. Add your details below &mdash; takes about two minutes.' +
+          '</p>';
+        intakeWrapper.hidden = false;
+        // Force reflow so the reveal animation runs cleanly
+        void intakeWrapper.offsetHeight;
+        intakeWrapper.classList.add('is-revealed');
+        setTimeout(function () {
+          intakeWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 650);
+      } else if (outcome.status === 'below-threshold') {
+        resultEl.className = 'qualifier__result';
+        resultEl.innerHTML =
+          '<h3 class="qualifier__result-headline">You may be eligible &mdash; but the math doesn’t quite work for our program at this scale.</h3>' +
+          '<p class="qualifier__result-body">' +
+            'Based on the duties you described, the cost of legal filing under this program may eat too much of the recovery to be worthwhile. The good news: you can pursue a refund directly through CBP’s official channels.' +
+          '</p>' +
+          '<p class="qualifier__result-cta" style="margin-bottom: 16px;">' +
+            '<a href="https://www.cbp.gov" target="_blank" rel="noopener" class="btn btn--ghost">CBP refund information &nbsp;&rarr;</a>' +
+          '</p>' +
+          '<p class="fine-print" style="margin-top: 14px;">' +
+            'If you’d still like a second opinion on your situation, you can ' +
+            '<a href="mailto:intake@refundharbor.com" style="color: var(--color-gold); border-bottom: 1px solid rgba(184,149,107,0.4);">email us</a>.' +
+          '</p>';
+        intakeWrapper.classList.remove('is-revealed');
+        intakeWrapper.hidden = true;
+      } else { // disqualified
+        resultEl.className = 'qualifier__result';
+        resultEl.innerHTML =
+          '<h3 class="qualifier__result-headline">This program isn’t the right fit.</h3>' +
+          '<p class="qualifier__result-body">' + escapeHTML(outcome.reason) + '</p>' +
+          '<p class="fine-print">' +
+            'If you think this is wrong or have questions about your specific situation, ' +
+            '<a href="mailto:intake@refundharbor.com" style="color: var(--color-gold); border-bottom: 1px solid rgba(184,149,107,0.4);">email us</a> and we’ll take a look.' +
+          '</p>';
+        intakeWrapper.classList.remove('is-revealed');
+        intakeWrapper.hidden = true;
+      }
+    }
+
+    qualifier.addEventListener('click', function (e) {
+      var btn = e.target.closest('button');
+      if (!btn) return;
+      var action = btn.dataset.action;
+
+      if (action === 'start') {
+        setStep('1');
+        return;
+      }
+
+      if (action === 'back') {
+        if (currentStep === '1') {
+          setStep('intro');
+        } else if (currentStep === 'result') {
+          setStep('7');
+        } else {
+          var n = parseInt(currentStep, 10);
+          if (!isNaN(n) && n > 1) setStep(String(n - 1));
+          else setStep('intro');
+        }
+        return;
+      }
+
+      if (action === 'restart') {
+        answers = {};
+        var selected = qualifier.querySelectorAll('.qualifier__option.is-selected');
+        for (var i = 0; i < selected.length; i++) selected[i].classList.remove('is-selected');
+        updateProgress();
+        setStatus('pending');
+        intakeWrapper.classList.remove('is-revealed');
+        intakeWrapper.hidden = true;
+        setStep('intro');
+        return;
+      }
+
+      // Answer click
+      if (btn.dataset.answer) {
+        var q = btn.dataset.q;
+        answers['q' + q] = btn.dataset.answer;
+
+        // Visually mark the selected option within this question
+        var options = qualifier.querySelectorAll('.qualifier__option[data-q="' + q + '"]');
+        for (var j = 0; j < options.length; j++) {
+          options[j].classList.toggle('is-selected', options[j] === btn);
+        }
+        updateProgress();
+
+        // Advance after a brief delay so the selection registers visually
+        var next = parseInt(q, 10) + 1;
+        setTimeout(function () {
+          if (next > 7) {
+            renderResult();
+            setStep('result');
+          } else {
+            setStep(String(next));
+          }
+        }, 200);
+      }
+    });
+  })();
+
   /* Intake form — AJAX submit with inline success/error states. */
   (function () {
     var form = document.getElementById('intake-form');
