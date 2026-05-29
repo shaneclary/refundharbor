@@ -1553,6 +1553,18 @@ em { color: var(--color-gold-light); font-style: italic; }
   .qualifier__status { font-size: 11px; padding: 6px 12px 6px 6px; }
 }
 
+/* The qualifier card sits on a white background inside a .section--navy,
+   so the parent's "force all headings to white" rule would otherwise make
+   the question titles invisible against the card. Pin them back to navy. */
+.section--navy .qualifier h1,
+.section--navy .qualifier h2,
+.section--navy .qualifier h3,
+.section--navy-deep .qualifier h1,
+.section--navy-deep .qualifier h2,
+.section--navy-deep .qualifier h3 {
+  color: var(--color-navy);
+}
+
 /* Intake credentials sidebar block */
 .intake__credentials {
   margin-top: 28px;
