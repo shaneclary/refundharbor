@@ -136,7 +136,7 @@
       <div class="process__step">
         <div class="process__num">3</div>
         <div class="process__title">Engagement</div>
-        <div class="process__desc">No upfront fee. The program advances the legal filing costs, reimbursed from your refund.</div>
+        <div class="process__desc">No upfront fee. No engagement fee. No legal costs billed separately.</div>
       </div>
       <div class="process__step">
         <div class="process__num">4</div>
@@ -146,7 +146,7 @@
       <div class="process__step">
         <div class="process__num">5</div>
         <div class="process__title">Refund</div>
-        <div class="process__desc">Refund issued to your business. Advanced legal costs reimbursed first, then a 20% contingency &mdash; due within 15 days of receipt.</div>
+        <div class="process__desc">Refund issued to your business. 20% contingency due within 15 days of receipt. No refund, no fee.</div>
       </div>
     </div>
 
@@ -257,10 +257,10 @@
         <div class="principal__role">Engagement Terms</div>
         <div class="principal__bio">
           <p>
-            Free eligibility review, with no upfront fee. The program advances the
-            legal filing costs, reimbursed from your refund, plus a 20% contingency
-            on amounts recovered. Advanced costs remain payable even if a filed
-            claim is denied.
+            Free eligibility review. No upfront fee, no engagement fee, no separately
+            billed legal costs. A flat 20% contingency on the amount actually recovered &mdash;
+            same rate whether you take the expedited cash advance or wait for the standard
+            CBP refund. No refund, no fee.
           </p>
         </div>
       </div>
@@ -327,25 +327,22 @@
         <summary>What does it cost?</summary>
         <div class="faq__answer">
           <p>
-            The eligibility review is free, and there is <strong>no upfront fee</strong> to
-            begin. If counsel confirms in writing that your entries are recoverable, the program
-            advances the law firm's costs to prepare and file your claim (the
-            <strong>legal processing fees</strong>). The exact amount is provided to you in
-            writing at the time of filing.
+            The eligibility review is free, and there is <strong>no upfront fee</strong> &mdash;
+            no engagement fee, no retainer, no legal costs billed separately to you. The only
+            fee is a <strong>20% contingency</strong> on the amount actually recovered, due
+            within 15 days of your business receiving the refund.
           </p>
           <p>
-            When a refund is issued, those advanced legal processing fees are reimbursed from it
-            first, and a <strong>20% contingency fee</strong> applies to the amount recovered,
-            due within 15 days of receipt. Some clients may instead be offered an optional cash
-            advance against an expected refund through a financing partner.
+            You can choose between two paths. <strong>Expedited return</strong> &mdash; a
+            financing partner advances the refund to you upfront, so the money is in your hands
+            now rather than later. <strong>Delayed return</strong> &mdash; you wait for CBP to
+            issue the refund in the normal course. The 20% contingency is the same on either
+            path; there is no discount for waiting.
           </p>
           <p>
-            Because the legal work is performed whether or not CBP grants the claim, the legal
-            processing fees are earned once your claim is filed and <strong>remain payable even
-            if the claim is denied</strong> or the refund is less than expected. No contingency
-            fee is owed on amounts not recovered. The controlling terms are set out in the
-            program services agreement with the program operator and your separate engagement
-            with counsel, which you should read in full before signing.
+            If no refund is recovered, no fee is owed. The controlling terms are set out in the
+            program services agreement you sign before any work begins, which you should read
+            in full.
           </p>
         </div>
       </details>
@@ -837,9 +834,9 @@
       } else if (outcome.status === 'below-threshold') {
         resultEl.className = 'qualifier__result';
         resultEl.innerHTML =
-          '<h3 class="qualifier__result-headline">You may be eligible &mdash; but the math doesn’t quite work for our program at this scale.</h3>' +
+          '<h3 class="qualifier__result-headline">You may be eligible &mdash; but recoveries at this scale typically aren’t a fit for the program.</h3>' +
           '<p class="qualifier__result-body">' +
-            'Based on the duties you described, the cost of legal filing under this program may eat too much of the recovery to be worthwhile. The good news: you can pursue a refund directly through CBP’s official channels.' +
+            'At smaller refund amounts, the most efficient path is usually to pursue your refund directly through CBP &mdash; either yourself or via your customs broker. The link below points to CBP’s official refund process.' +
           '</p>' +
           '<p class="qualifier__result-cta" style="margin-bottom: 16px;">' +
             '<a href="https://www.cbp.gov" target="_blank" rel="noopener" class="btn btn--ghost">CBP refund information &nbsp;&rarr;</a>' +

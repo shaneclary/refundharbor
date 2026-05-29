@@ -45,10 +45,11 @@ Plain HTML + one shared stylesheet. No build step. Deploys to Vercel as static f
 4. **Fill the dates.** Replace `[Month Day, 2026]` "last updated" dates on the
    legal pages.
 5. **Confirm the figures.** Statistics in the hero/stats/FAQ ($166B, 301,000+,
-   timelines, 40% rejection rate, deadlines) and fee terms (no upfront fee,
-   legal processing fees reimbursed from the refund and owed even on denial,
-   20% contingency) are marketing copy — verify they match the actual program
-   services agreement and engagement agreement.
+   timelines, 40% rejection rate, deadlines) and fee terms (free eligibility
+   review, no upfront fee, flat 20% contingency on amounts recovered with no
+   discount for delayed return, no fee if no recovery) are marketing copy —
+   verify they match the actual program services agreement and engagement
+   agreement.
 
 ## Local preview
 
