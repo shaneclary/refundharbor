@@ -1524,6 +1524,30 @@ em { color: var(--color-gold-light); font-style: italic; }
   margin: 0 0 22px;
 }
 .qualifier__result--qualified .qualifier__result-headline { color: var(--color-navy); }
+
+/* "Continue to your details ↓" call-to-action button on the qualified result.
+   No auto-scroll — the user opts in by clicking. */
+.qualifier__continue {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-gold);
+  background: transparent;
+  border: 0;
+  border-bottom: 1.5px solid var(--color-gold);
+  padding: 4px 0 6px;
+  margin: 0 0 6px;
+  cursor: pointer;
+  transition: color 180ms ease, border-color 180ms ease;
+}
+.qualifier__continue:hover {
+  color: var(--color-navy);
+  border-color: var(--color-navy);
+}
 .qualifier__result--qualified::before {
   content: "";
   display: block;

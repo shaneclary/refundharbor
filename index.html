@@ -823,14 +823,16 @@
           '<h3 class="qualifier__result-headline">Looks like a fit.</h3>' +
           '<p class="qualifier__result-body">' +
             'Based on your answers, your business appears to qualify for the program. The next step is a free eligibility review by trade counsel. Add your details below &mdash; takes about two minutes.' +
-          '</p>';
+          '</p>' +
+          '<button type="button" class="qualifier__continue" data-action="continue">' +
+            'Continue to your details &nbsp;&darr;' +
+          '</button>';
         intakeWrapper.hidden = false;
-        // Force reflow so the reveal animation runs cleanly
+        // Force reflow so the reveal animation runs cleanly. No auto-scroll —
+        // the user sees the headline, reads it, and clicks "Continue" when
+        // they're ready to move to the form.
         void intakeWrapper.offsetHeight;
         intakeWrapper.classList.add('is-revealed');
-        setTimeout(function () {
-          intakeWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 650);
       } else if (outcome.status === 'below-threshold') {
         resultEl.className = 'qualifier__result';
         resultEl.innerHTML =
@@ -881,6 +883,12 @@
           if (!isNaN(n) && n > 1) setStep(String(n - 1));
           else setStep('intro');
         }
+        return;
+      }
+
+      if (action === 'continue') {
+        // User-initiated scroll to the now-revealed intake form.
+        intakeWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
         return;
       }
 
