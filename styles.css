@@ -189,12 +189,12 @@ em { color: var(--color-gold-light); font-style: italic; }
   align-items: center;
 }
 .header__brand-logo img {
-  height: 112px;
+  height: 336px;
   width: auto;
   display: block;
 }
 @media (max-width: 540px) {
-  .header__brand-logo img { height: 88px; }
+  .header__brand-logo img { height: 264px; }
 }
 .header__nav {
   display: flex;
@@ -960,7 +960,7 @@ em { color: var(--color-gold-light); font-style: italic; }
   margin-bottom: 18px;
 }
 .footer__brand-logo img {
-  height: 144px;
+  height: 432px;
   width: auto;
   display: block;
 }
@@ -1165,7 +1165,7 @@ em { color: var(--color-gold-light); font-style: italic; }
   display: inline-block;
 }
 .letter__head-logo img {
-  height: 144px;
+  height: 432px;
   width: auto;
   display: block;
 }
