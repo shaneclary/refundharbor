@@ -181,17 +181,11 @@ em { color: var(--color-gold-light); font-style: italic; }
 }
 .header__brand-mark svg { width: 100%; height: 100%; display: block; }
 
-/* PNG brand lockup. Currently sits on a cream "stamp" pill background
-   because the PNG file has a solid (non-transparent) background — the
-   pill makes the edge look intentional instead of accidental.
-   Remove the background/border/padding once a transparent-bg PNG is
-   re-exported. */
+/* PNG brand lockup — sits bare on the dark navy header now that the
+   PNG has a transparent background. */
 .header__brand-logo {
   display: inline-flex;
   align-items: center;
-  background: var(--color-cream);
-  padding: 6px 14px;
-  border: 1px solid rgba(184, 149, 107, 0.22);
 }
 .header__brand-logo img {
   height: 168px;
@@ -199,7 +193,6 @@ em { color: var(--color-gold-light); font-style: italic; }
   display: block;
 }
 @media (max-width: 540px) {
-  .header__brand-logo { padding: 5px 10px; }
   .header__brand-logo img { height: 132px; }
 }
 .header__nav {
@@ -959,14 +952,10 @@ em { color: var(--color-gold-light); font-style: italic; }
 }
 .footer__brand-mark svg { width: 100%; height: 100%; display: block; }
 
-/* Footer logo — matches the header treatment. Cream stamp pill while
-   the PNG has a non-transparent background; remove once re-exported. */
+/* Footer logo — bare on the dark navy, matching the header. */
 .footer__brand-logo {
   display: inline-flex;
   align-items: center;
-  background: var(--color-cream);
-  padding: 8px 16px;
-  border: 1px solid rgba(184, 149, 107, 0.25);
   margin-bottom: 18px;
 }
 .footer__brand-logo img {
